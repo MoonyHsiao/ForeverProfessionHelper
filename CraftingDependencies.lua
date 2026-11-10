@@ -109,11 +109,11 @@ function A:SimulateCraftInputs(recipe, times, initialStock, initialProduced, byI
             -- value: compare extra spending per expected skill point.
             -- Keep unknown-price candidates below fully priced options.
             local trialGain = math.max(0, trial.skill - s.skill)
-            local buyGain = math.max(0, buy.skill - s.skill)
+            local bestGain = math.max(0, best.skill - s.skill)
             local trialUnitCost = trial.cost / (1 + trialGain)
-            local buyUnitCost = buy.cost / (1 + buyGain)
+            local bestUnitCost = best.cost / (1 + bestGain)
             if trial.unknown < best.unknown or
-              (trial.unknown == best.unknown and trialUnitCost < buyUnitCost) then
+              (trial.unknown == best.unknown and trialUnitCost < bestUnitCost) then
               best = trial
             end
           end
