@@ -32,10 +32,14 @@ function A:GetEligibleProfessions()
   return valid
 end
 
-function A:GetCachedPrimaryPlanText(skillID)
-  if not self.initialized then return self:T("CHAR_NOT_READY") end
+function A:GetStaticPlanSections(skillID)
+  if not self.initialized then
+    return {route = self:T("CHAR_NOT_READY"), materials = self:T("CHAR_NOT_READY")}
+  end
   local valid = self:GetEligibleProfessions()
-  if #valid == 0 then return self:T("NO_ELIGIBLE") end
+  if #valid == 0 then
+    return {route = self:T("NO_ELIGIBLE"), materials = self:T("NO_ELIGIBLE")}
+  end
   local selected = valid[1]
   for _, prof in ipairs(valid) do
     if tonumber(skillID) == prof.id then selected = prof; break end
@@ -43,9 +47,11 @@ function A:GetCachedPrimaryPlanText(skillID)
   self.selectedProfessionID = selected.id
   local guide = self.GetGatheringGuide and self:GetGatheringGuide(selected.id, selected.rank)
   if selected.id == 182 or selected.id == 393 then
-    return guide or self:T("GUIDE_UNAVAILABLE")
+    return {route = guide or self:T("GUIDE_UNAVAILABLE"), materials = self:T("GUIDE_UNAVAILABLE")}
   end
-  if not self.recipeDatabaseReady then return self:T("PLAN_DB") end
+  if not self.recipeDatabaseReady then
+    return {route = self:T("PLAN_DB"), materials = self:T("PLAN_DB")}
+  end
 
   local index = RecipeIndex(selected.id)
   local current = tonumber(selected.rank) or 1
@@ -65,14 +71,12 @@ function A:GetCachedPrimaryPlanText(skillID)
       (GetSpellInfo and GetSpellInfo(spell)) or tostring(spell)
     local colorName = ({"ORANGE", "YELLOW", "GREEN"})[color] or "UNKNOWN"
     if color == 3 then hasGreen = true end
-    local prepLines = {}
+    local prepEntries = {}
     for _, entry in ipairs(step[5] or {}) do
       local prepID, count, expected = entry[1], entry[2], entry[3]
-      local prep = index[prepID]
-      local prepName = (prep and prep.name) or
-        (GetSpellInfo and GetSpellInfo(prepID)) or tostring(prepID)
-      prepLines[#prepLines + 1] = self:T("CRAFT_PREREQUISITE_GAIN",
-        prepName, count, expected)
+      prepEntries[#prepEntries + 1] = {
+        id = prepID, count = count, expected = expected,
+      }
       prepGain = prepGain + expected
     end
     for _, material in ipairs(step[6] or {}) do
@@ -80,9 +84,34 @@ function A:GetCachedPrimaryPlanText(skillID)
       materials[id] = (materials[id] or 0) + qty
     end
     local finish = math.min(300, projected + gain)
-    rows[#rows + 1] = {from = projected, to = finish, name = name,
-      crafts = crafts, color = colorName, preparations = prepLines,
-      recipe = recipe, spell = spell}
+    local previous = rows[#rows]
+    -- Aggregate adjacent levels using the same recipe and skill color.
+    -- Keep prerequisite order stable and sum their craft counts/skill gains.
+    if previous and previous.spell == spell and previous.color == colorName then
+      previous.to = finish
+      previous.crafts = previous.crafts + crafts
+      for _, prep in ipairs(prepEntries) do
+        local existing = previous.prepByID[prep.id]
+        if existing then
+          existing.count = existing.count + prep.count
+          existing.expected = existing.expected + prep.expected
+        else
+          local combined = {id = prep.id, count = prep.count, expected = prep.expected}
+          previous.preparations[#previous.preparations + 1] = combined
+          previous.prepByID[prep.id] = combined
+        end
+      end
+    else
+      local stage = {from = projected, to = finish, name = name,
+        crafts = crafts, color = colorName, preparations = {},
+        prepByID = {}, recipe = recipe, spell = spell}
+      for _, prep in ipairs(prepEntries) do
+        local combined = {id = prep.id, count = prep.count, expected = prep.expected}
+        stage.preparations[#stage.preparations + 1] = combined
+        stage.prepByID[prep.id] = combined
+      end
+      rows[#rows + 1] = stage
+    end
     projected = finish
     operations = operations + 1
   end
@@ -94,36 +123,52 @@ function A:GetCachedPrimaryPlanText(skillID)
     self:T("PLAN_DISCLAIMER"),
   }
   for i, stage in ipairs(rows) do
-    for _, prepLine in ipairs(stage.preparations) do
-      lines[#lines + 1] = prepLine
+    if i > 35 then
+      lines[#lines + 1] = self:T("MORE_STAGES")
+      break
+    end
+    for _, entry in ipairs(stage.preparations) do
+      local prep = index[entry.id]
+      local prepName = (prep and prep.name) or
+        (GetSpellInfo and GetSpellInfo(entry.id)) or tostring(entry.id)
+      lines[#lines + 1] = self:T("CRAFT_PREREQUISITE_GAIN",
+        prepName, entry.count, entry.expected)
     end
     lines[#lines + 1] = string.format("%d-%d: %s x%d [%s]",
       math.floor(stage.from), math.floor(stage.to), stage.name,
       stage.crafts, self:T("COLOR_" .. stage.color))
-    if i >= 35 then
-      lines[#lines + 1] = self:T("MORE_STAGES")
-      break
-    end
   end
   if prepGain > 0 then lines[#lines + 1] = self:T("TOTAL_PREP_GAIN", prepGain) end
   if hasGreen then lines[#lines + 1] = self:T("GREEN_FALLBACK") end
   if projected < 300 then lines[#lines + 1] = self:T("PLAN_INCOMPLETE") end
 
-  lines[#lines + 1] = self:T("SHOPPING")
+  if guide then lines[#lines + 1] = ""; lines[#lines + 1] = guide end
+  local materialLines = {
+    selected.name .. " " .. current .. "/300",
+    "",
+    self:T("SHOPPING"),
+  }
   local ids = {}
   for id in pairs(materials) do ids[#ids + 1] = id end
   table.sort(ids)
-  for i, id in ipairs(ids) do
-    local itemName = (GetItemInfo and GetItemInfo(id)) or self:T("ITEM_FALLBACK", id)
-    lines[#lines + 1] = string.format("  %s x%d", itemName, materials[id])
-    if i >= 35 then
-      lines[#lines + 1] = self:T("SHOPPING_MORE")
-      break
-    end
+  if #ids == 0 then
+    materialLines[#materialLines + 1] = self:T("MATERIALS_EMPTY")
   end
-  if guide then lines[#lines + 1] = ""; lines[#lines + 1] = guide end
-  return table.concat(lines, "\n")
+  for _, id in ipairs(ids) do
+    local itemName = (GetItemInfo and GetItemInfo(id)) or self:T("ITEM_FALLBACK", id)
+    materialLines[#materialLines + 1] = string.format("  %s x%d", itemName, materials[id])
+  end
+  return {
+    route = table.concat(lines, "\n"),
+    materials = table.concat(materialLines, "\n"),
+  }
 end
+
+function A:GetCachedPrimaryPlanText(skillID)
+  local sections = self:GetStaticPlanSections(skillID)
+  return sections.route
+end
+
 
 -- Retain no-op compatibility with older Core.lua callers. Neither function
 -- starts calculations, registers workers, or invalidates any generated routes.
