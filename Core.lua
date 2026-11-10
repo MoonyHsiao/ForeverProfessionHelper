@@ -53,6 +53,7 @@ function A:Initialize()
   self:ScanProfessions()
   self:LoadRecipeDatabase()
   self:ScanBags()
+  self:PreparePlanCache()
   self:Print(self:T("LOAD_MESSAGE"))
 end
 
@@ -100,6 +101,7 @@ SlashCmdList.FOREVERPROFESSIONHELPER = function(message)
     A:Print(A:T("LANGUAGE") .. ": " .. (A.languageNames[A.db.language or "auto"] or "Auto"))
   elseif message == "db" then
     local ready, status = A:LoadRecipeDatabase()
+    A:InvalidatePlanCache("database")
     A:Print(A:T("CHAT_DB", tostring(status)))
     A:Print(A:T("CHAT_PARSED", A.recipeCount or 0, A.reagentCount or 0))
     local ids = {}
@@ -111,6 +113,7 @@ SlashCmdList.FOREVERPROFESSIONHELPER = function(message)
     if A.bankOpen then A:ScanBank() end
     A:ScanProfessions()
     A:ScanKnownRecipes()
+    A:InvalidatePlanCache("manual")
     A:Print(A:T("RESCANNED"))
   elseif message == "help" then
     A:Print(A:T("CHAT_HELP"))
