@@ -25,21 +25,11 @@ local function CopyState(s)
     reused = CopyMap(s.reused),
     preparations = preparations,
     sequence = sequence,
-    cost = s.cost,
-    unknown = s.unknown,
     skill = s.skill,
     gainedFromPrep = s.gainedFromPrep,
     gainedFromMain = s.gainedFromMain,
     mainColor = s.mainColor,
   }
-end
-local function Price(itemID)
-  if not A.GetPrice then return nil end
-  local price, source = A:GetPrice(itemID)
-  if source == "auctionator" and type(price) == "number" and price > 0 then
-    return price
-  end
-  return nil
 end
 local function ProducerValid(recipe, level)
   if not recipe.trainer or recipe.hidden or recipe.requiredSpec then return false end
@@ -66,7 +56,7 @@ end
 function A:SimulateCraftInputs(recipe, times, initialStock, initialProduced, byItem, skillLevel)
   local state = {
     stock = CopyMap(initialStock), produced = CopyMap(initialProduced),
-    shopping = {}, reused = {}, preparations = {}, sequence = {}, cost = 0, unknown = 0,
+    shopping = {}, reused = {}, preparations = {}, sequence = {},
     skill = tonumber(skillLevel) or 1,
     gainedFromPrep = 0, gainedFromMain = 0, mainColor = nil,
   }
@@ -82,45 +72,37 @@ function A:SimulateCraftInputs(recipe, times, initialStock, initialProduced, byI
     need = need - held
     if need <= 0 then return s end
 
-    -- Direct purchase or unknown-price sourcing.
-    local buy = CopyState(s)
-    buy.shopping[itemID] = (buy.shopping[itemID] or 0) + need
-    local price = Price(itemID)
-    if price then buy.cost = buy.cost + price * need
-    else buy.unknown = buy.unknown + 1 end
-    local best = buy
-
-    -- Shallow recursive make-vs-buy comparison. No cycles or unlearnable
-    -- recipes; never choose a producer with only a vendor/drop recipe source.
+    -- No market pricing or real inventory is consulted. Craft eligible
+    -- same-profession intermediates before the parent recipe; select a
+    -- producer by expected skill gain, then raw material quantity.
+    local best, bestGain, bestUnits = nil, -1, math.huge
     if depth < 3 and not active[itemID] then
       for _, producer in ipairs((byItem and byItem[itemID]) or {}) do
         if ProducerValid(producer, s.skill) then
-          local count = math.max(1, math.floor(tonumber(producer.craftedQuantity) or 1))
-          local operations = math.ceil(need / count)
+          local outputCount = math.max(1, math.floor(tonumber(producer.craftedQuantity) or 1))
+          local operations = math.ceil(need / outputCount)
           local trial = CopyState(s)
           active[itemID] = true
           trial = craft(trial, producer, operations, depth + 1, active, true)
           active[itemID] = nil
           if trial and (trial.stock[itemID] or 0) >= need then
             trial.stock[itemID] = trial.stock[itemID] - need
-            trial.reused[itemID] = (trial.reused[itemID] or 0) + need
             trial.produced[itemID] = math.max(0, (trial.produced[itemID] or 0) - need)
-            -- Prerequisite crafts have leveling value as well as material
-            -- value: compare extra spending per expected skill point.
-            -- Keep unknown-price candidates below fully priced options.
-            local trialGain = math.max(0, trial.skill - s.skill)
-            local bestGain = math.max(0, best.skill - s.skill)
-            local trialUnitCost = trial.cost / (1 + trialGain)
-            local bestUnitCost = best.cost / (1 + bestGain)
-            if trial.unknown < best.unknown or
-              (trial.unknown == best.unknown and trialUnitCost < bestUnitCost) then
-              best = trial
+            trial.reused[itemID] = (trial.reused[itemID] or 0) + need
+            local gained = trial.skill - s.skill
+            local units = 0
+            for _, qty in pairs(trial.shopping) do units = units + qty end
+            if not best or gained > bestGain or
+              (gained == bestGain and units < bestUnits) then
+              best, bestGain, bestUnits = trial, gained, units
             end
           end
         end
       end
     end
-    return best
+    if best then return best end
+    s.shopping[itemID] = (s.shopping[itemID] or 0) + need
+    return s
   end
   craft = function(s, targetRecipe, operations, depth, active, preparation)
     for _ = 1, operations do
