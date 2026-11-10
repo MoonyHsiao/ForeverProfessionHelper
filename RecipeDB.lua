@@ -3,7 +3,7 @@ local A = ns.A
 
 -- External Forever-aware recipe data: LibProfessionDB-1.0.
 -- An absent or partially parsed catalog MUST NOT produce negative judgments.
-local index, covered, records = {}, {}, 0
+local index, covered, records, ingredients = {}, {}, 0, 0
 local nonCrafting = { [182]=true, [393]=true, [356]=true } -- herbalism, skinning, fishing
 
 local function add(itemID, skillID, recipeName)
@@ -14,6 +14,7 @@ local function add(itemID, skillID, recipeName)
   local names = perItem[skillID] or {}
   perItem[skillID] = names
   if #names < 3 then names[#names + 1] = tostring(recipeName or "?") end
+  ingredients = ingredients + 1
 end
 
 local function addReagents(skillID, name, recipe)
@@ -32,7 +33,7 @@ local function addReagents(skillID, name, recipe)
 end
 
 function A:LoadRecipeDatabase()
-  index, covered, records = {}, {}, 0
+  index, covered, records, ingredients = {}, {}, 0, 0
   local lib = LibStub and LibStub("LibProfessionDB-1.0", true)
   local status
   if not lib or not lib.IsReady or not lib:IsReady() then
@@ -54,7 +55,7 @@ function A:LoadRecipeDatabase()
         if skillID then
           local ok, recipes = pcall(lib.GetRecipes, lib, skillID)
           if ok and type(recipes) == "table" then
-            local count = 0
+            local count, before = 0, ingredients
             for spellID, entry in pairs(recipes) do
               local recipe = entry
               if type(entry) == "number" and lib.GetRecipe then
@@ -66,7 +67,7 @@ function A:LoadRecipeDatabase()
                 count = count + 1
               end
             end
-            if count > 0 then
+            if count > 0 and ingredients > before then
               covered[skillID] = true
               records = records + count
             end
@@ -76,7 +77,8 @@ function A:LoadRecipeDatabase()
     end
     if records == 0 then status = "配方索引為空；資料庫格式可能不相容" end
   end
-  self.recipeDatabaseReady = records > 0
+  -- A catalog that yields no usable ingredient ids is not safe for negative labels.
+  self.recipeDatabaseReady = records > 0 and ingredients > 0
   self.recipeDatabaseStatus = self.recipeDatabaseReady and records or status
   self:Notify("recipeDB")
   return self.recipeDatabaseReady, self.recipeDatabaseStatus
