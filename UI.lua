@@ -125,6 +125,9 @@ local function RenderInteractiveRoute(sections)
   if sections.skillCapNotice then
     headerText = headerText .. "\n|cffff6644" .. sections.skillCapNotice .. "|r"
   end
+  if sections.hasNonTrainerFallback then
+    headerText = headerText .. "\n|cffffaa55" .. A:T("ROUTE_RECIPE_EXCEPTION_NOTICE") .. "|r"
+  end
   headerText = headerText .. "\n" .. A:T("PLAN_DISCLAIMER")
     .. "\n" .. A:T("RECIPE_TOOLTIP_HINT")
   routeHeader:SetText(headerText)
