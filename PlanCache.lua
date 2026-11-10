@@ -16,6 +16,23 @@ local function RecipeIndex(skillID)
   return bySpell
 end
 
+-- Prefer localized profession database names; GetSpellInfo may return nil
+-- for unlearned crafting spells on Forever. The offline map stays readable.
+function A:GetRecipeDisplayName(skillID, spellID)
+  local recipe = RecipeIndex(skillID)[tonumber(spellID)]
+  local name = recipe and recipe.name
+  if name and name ~= "" and name ~= tostring(spellID) then return name end
+  if GetSpellInfo then
+    name = GetSpellInfo(spellID)
+    if name and name ~= "" then return name end
+  end
+  if self.GetOfflineRecipeName then
+    name = self:GetOfflineRecipeName(spellID)
+    if name then return name end
+  end
+  return tostring(spellID)
+end
+
 function A:GetEligibleProfessions()
   local valid = {}
   for id, skill in pairs(self:Character().professions or {}) do
@@ -86,8 +103,7 @@ function A:GetStaticPlanSections(skillID)
     -- The fixed guide deliberately never re-ranks choices based on bags,
     -- banks, prices, or user interactions.
     local recipe = index[spell]
-    local name = (recipe and recipe.name) or
-      (GetSpellInfo and GetSpellInfo(spell)) or tostring(spell)
+    local name = self:GetRecipeDisplayName(selected.id, spell)
     local colorName = ({"ORANGE", "YELLOW", "GREEN"})[color] or "UNKNOWN"
     if color == 3 then hasGreen = true end
     local prepEntries = {}
@@ -151,8 +167,7 @@ function A:GetStaticPlanSections(skillID)
     end
     for _, entry in ipairs(stage.preparations) do
       local prep = index[entry.id]
-      local prepName = (prep and prep.name) or
-        (GetSpellInfo and GetSpellInfo(entry.id)) or tostring(entry.id)
+      local prepName = self:GetRecipeDisplayName(selected.id, entry.id)
       lines[#lines + 1] = self:T("CRAFT_PREREQUISITE_GAIN",
         prepName, entry.count, entry.expected)
     end
