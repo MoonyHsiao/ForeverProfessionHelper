@@ -79,17 +79,35 @@ function A:ShowWindow(showPlan)
     planButton:SetText("升級推薦")
     planButton:SetScript("OnClick", function()
       activeMode = "plan"
-      body:SetText(A:GetPrimaryPlanText())
+      body:SetText(A:GetPrimaryPlanText(A.selectedProfessionID))
+    end)
+    local cycleButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    cycleButton:SetSize(115, 23)
+    cycleButton:SetPoint("RIGHT", planButton, "LEFT", -6, 0)
+    cycleButton:SetText("切換專業")
+    cycleButton:SetScript("OnClick", function()
+      local list = A:GetEligibleProfessions()
+      if #list == 0 then return end
+      local nextIndex = 1
+      for i, skill in ipairs(list) do
+        if skill.id == A.selectedProfessionID then
+          nextIndex = i % #list + 1
+          break
+        end
+      end
+      A.selectedProfessionID = list[nextIndex].id
+      activeMode = "plan"
+      body:SetText(A:GetPrimaryPlanText(A.selectedProfessionID))
     end)
     self:RegisterView("overview", function()
       if frame:IsShown() then
-        body:SetText(activeMode == "plan" and A:GetPrimaryPlanText() or A:BuildOverview())
+        body:SetText(activeMode == "plan" and A:GetPrimaryPlanText(A.selectedProfessionID) or A:BuildOverview())
       end
     end)
   end
   if showPlan and self.GetPrimaryPlanText then
     activeMode = "plan"
-    body:SetText(self:GetPrimaryPlanText())
+    body:SetText(self:GetPrimaryPlanText(self.selectedProfessionID))
   else
     activeMode = "overview"
     body:SetText(self:BuildOverview())
