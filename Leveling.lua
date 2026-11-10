@@ -2,24 +2,6 @@ local _, ns = ...
 local A = ns.A
 -- Approximate greedy planner: each step minimizes extra acquisition cost per
 -- expected skill point. It is NOT a globally optimal shortest-path solver.
-local function Copper(id)
-  if Auctionator and Auctionator.API and Auctionator.API.v1 and
-      type(Auctionator.API.v1.GetAuctionPriceByItemID) == "function" then
-    local ok, price = pcall(Auctionator.API.v1.GetAuctionPriceByItemID,
-      "ForeverProfessionHelper", tonumber(id))
-    if ok and type(price) == "number" and price > 0 then return price, "auctionator" end
-  end
-  if GetItemInfo then
-    local _, _, _, _, _, _, _, _, _, _, vendor = GetItemInfo(id)
-    if type(vendor) == "number" and vendor > 0 then
-      return vendor, "vendor-sell-value"
-    end
-  end
-  return nil, "unknown"
-end
-function A:GetPrice(itemID)
-  return Copper(itemID)
-end
 -- Prefer Forever-specific thresholds from OneForAll. Fall back to
 -- LibProfessionDB difficulty data for recipes absent from the numeric dataset.
 local function SkillChance(recipe, level)
@@ -44,33 +26,24 @@ end
 function A:EstimateSkillChance(recipe, level)
   return SkillChance(recipe, level)
 end
-local function Holdings(self)
-  local stock = {}
-  for _, ch in pairs(self:Store().characters) do
-    for _, place in ipairs({"bags", "bank"}) do
-      for id, n in pairs(ch[place] or {}) do
-        stock[id] = (stock[id] or 0) + n
-      end
-    end
-  end
-  return stock
-end
-local function Score(recipe, stock, producedStock, byItem, level)
+-- Static leveling heuristic: optimize skill-ups and reagent quantities,
+-- independent of any character inventory or Auctionator pricing.
+local function Score(recipe, simulatedStock, produced, craftingIndex, level)
   local chance, color = SkillChance(recipe, level)
-  if not chance or chance == 0 then return nil end
-  if recipe.hidden or recipe.requiredSpec or not recipe.trainer then return nil end
-  local colors = A.GetOneForAllSkillThresholds and A:GetOneForAllSkillThresholds(recipe.skillID, recipe.id)
-  local required = colors and colors[1] or recipe.requiredSkill
-  if (required or 9999) > level then return nil end
-  local estimate = A:SimulateCraftInputs(recipe, 1, stock, producedStock, byItem, level)
-  local gain = estimate.skill - level
-  -- Do not recommend crafting a gray parent recipe just because its
-  -- prerequisites happen to award skill points.
-  if gain <= 0 or (estimate.gainedFromMain or 0) <= 0 then return nil end
-  return { cost = estimate.cost / gain, unknown = estimate.unknown,
-    chance = chance, expectedGain = gain, missing = estimate.shopping,
-    color = estimate.mainColor or color, tier = (estimate.mainColor or color) == "green" and 1 or 0 }
+  if not chance or recipe.hidden or recipe.requiredSpec or not recipe.trainer then return nil end
+  local levels = A.GetOneForAllSkillThresholds and A:GetOneForAllSkillThresholds(recipe.skillID, recipe.id)
+  local required = levels and levels[1] or recipe.requiredSkill
+  if not required or required > level then return nil end
+  local estimated = A:SimulateCraftInputs(recipe, 1, simulatedStock, produced, craftingIndex, level)
+  local gain = estimated.skill - level
+  if gain <= 0 or estimated.gainedFromMain <= 0 then return nil end
+  local materialUnits = 0
+  for _, quantity in pairs(estimated.shopping) do materialUnits = materialUnits + quantity end
+  local actualColor = estimated.mainColor or color
+  return {effort = materialUnits / gain, expectedGain = gain,
+    tier = actualColor == "green" and 1 or 0, color = actualColor}
 end
+
 -- Candidate lists are stable for a given profession/skill level. Build them
 -- once; changing stock/prices never requires rescanning all recipe metadata.
 local candidateIndex = {}
@@ -107,10 +80,10 @@ function A:PlanProfession(skillID, target, progressYield)
   target = math.min(300, tonumber(target) or 300)
   local recipes = self:GetRecipesForSkill(skillID)
   if #recipes == 0 then return nil, self:T("PLAN_NO_RECIPES") end
-  local stock = Holdings(self)
+  local stock = {} -- Only simulated crafting outputs; never actual character stock.
   local producedStock, reusedOutputs = {}, {}
   local craftingIndex = self:BuildCraftingIndex(recipes)
-  local lines, shopping, steps, unresolved = {}, {}, 0, false
+  local lines, shopping, steps = {}, {}, 0
   local usedGreen = false
   local diagnostic = { available = #recipes, trainer = 0, learnable = 0, difficultyUnknown = 0 }
   local maxSteps = 300
@@ -129,16 +102,14 @@ function A:PlanProfession(skillID, target, progressYield)
       local score = Score(recipe, stock, producedStock, craftingIndex, current)
       if progressYield then progressYield(1, current, target) end
       if score then
-        -- Unknown prices are a fallback, not a reason to hide every recipe.
         if not bestScore or score.tier < bestScore.tier
-          or (score.tier == bestScore.tier and score.unknown < bestScore.unknown)
-          or (score.tier == bestScore.tier and score.unknown == bestScore.unknown and score.cost < bestScore.cost) then
+          or (score.tier == bestScore.tier and score.effort < bestScore.effort)
+          or (score.tier == bestScore.tier and score.effort == bestScore.effort and recipe.id < best.id) then
           best, bestScore = recipe, score
         end
       end
     end
     if not best then break end
-    if bestScore.unknown > 0 then unresolved = true end
     if bestScore.color == "green" then usedGreen = true end
     local times = math.max(1, math.min(20, math.ceil(1 / bestScore.expectedGain)))
     local start = current
@@ -174,7 +145,6 @@ function A:PlanProfession(skillID, target, progressYield)
     else
       lines[#lines + 1] = {
         from = start, to = current, crafts = times, recipe = best,
-        estimatedCostPerSkill = bestScore.cost,
         color = bestScore.color,
         preparations = simulated.preparations,
         sequence = simulated.sequence,
@@ -182,18 +152,10 @@ function A:PlanProfession(skillID, target, progressYield)
       }
     end
   end
-  local totalCost, unknownPrices = 0, {}
-  for id, qty in pairs(shopping) do
-    local price, source = Copper(id)
-    if price and source == "auctionator" then totalCost = totalCost + price * qty
-    else unknownPrices[#unknownPrices + 1] = id end
-  end
-  table.sort(unknownPrices)
   return {
     skillID = skillID, from = skill.rank, to = current, target = target,
-    lines = lines, shopping = shopping, estimatedExtraCopper = totalCost,
-    unknownPrices = unknownPrices,
-    approximate = true, incomplete = current < target, missingPrices = unresolved,
+    lines = lines, shopping = shopping,
+    approximate = true, incomplete = current < target,
     diagnostics = diagnostic,
     usedGreen = usedGreen,
     reusedOutputs = reusedOutputs,
@@ -285,14 +247,6 @@ function A:RenderPlanSummary(skillID, result)
   for i, id in ipairs(ids) do
     textLines[#textLines + 1] = string.format("  %s ×%d", (GetItemInfo and GetItemInfo(id)) or (self:T("ITEM_FALLBACK", id)), result.shopping[id])
     if i >= 35 then textLines[#textLines + 1] = self:T("SHOPPING_MORE"); break end
-  end
-  textLines[#textLines + 1] = string.format(self:T("COST"),
-    math.floor(result.estimatedExtraCopper / 10000),
-    math.floor(result.estimatedExtraCopper % 10000 / 100),
-    math.floor(result.estimatedExtraCopper % 100))
-  if result.missingPrices then textLines[#textLines + 1] = self:T("PRICES_INCOMPLETE") end
-  if #result.unknownPrices > 0 then
-    textLines[#textLines + 1] = self:T("PRICE_NOTE", #result.unknownPrices)
   end
   return table.concat(textLines, "\n")
 end
