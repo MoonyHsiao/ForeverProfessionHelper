@@ -28,25 +28,61 @@ local guides = {
     {236,300,"剝取約 47～60 級野獸","塔納利斯／菲拉斯／安戈洛環形山"},
   },
 }
+local english = {
+  [182] = {
+    {"Peacebloom, Silverleaf, Earthroot","Elwynn Forest / Durotar / Tirisfal Glades"},
+    {"Mageroyal, Briarthorn, Bruiseweed","Darkshore / The Barrens"},
+    {"Bruiseweed, Wild Steelbloom, Kingsblood, Liferoot","Wetlands / Hillsbrad Foothills"},
+    {"Fadeleaf, Goldthorn, Khadgar's Whisker","Stranglethorn Vale / Arathi Highlands"},
+    {"Purple Lotus, Firebloom","Tanaris / Searing Gorge"},
+    {"Sungrass, Blindweed, Golden Sansam","The Hinterlands / Feralas"},
+    {"Dreamfoil, Mountain Silversage, Plaguebloom","Felwood / Azshara"},
+  },
+  [186] = {
+    {"Copper Vein (can smelt Copper Bars)","Elwynn Forest / Dun Morogh / Loch Modan"},
+    {"Tin and Silver Ore (can smelt Bronze Bars)","Redridge Mountains / Duskwood / Wetlands"},
+    {"Iron and Gold Ore (can smelt Iron Bars)","Arathi Highlands / Thousand Needles / Stranglethorn Vale"},
+    {"Mithril and Truesilver Ore","Badlands / Tanaris / Feralas"},
+    {"Thorium and Rich Thorium Veins","Un'Goro Crater / Burning Steppes / Winterspring"},
+  },
+  [393] = {
+    {"Skin beasts around level 1-15","Elwynn Forest / Dun Morogh / Durotar"},
+    {"Skin beasts around level 15-30","Westfall / The Barrens / Wetlands"},
+    {"Skin beasts around level 30-36","Ashenvale / Wetlands"},
+    {"Skin beasts around level 36-41","Desolace / Thousand Needles"},
+    {"Skin beasts around level 41-47","Dustwallow Marsh / Stranglethorn Vale"},
+    {"Skin beasts around level 47-60","Tanaris / Feralas / Un'Goro Crater"},
+  },
+}
+local professionNames = {
+  enUS = {[182]="Herbalism",[186]="Mining",[393]="Skinning"},
+  zhTW = {[182]="草藥學",[186]="採礦",[393]="剝皮"},
+  zhCN = {[182]="草药学",[186]="采矿",[393]="剥皮"},
+}
 function A:GetGatheringGuide(skillID, current)
   skillID, current = tonumber(skillID), tonumber(current) or 1
   local stages = guides[skillID]
   if not stages then return nil end
-  local name = ({[182]="草藥學",[186]="採礦",[393]="剝皮"})[skillID]
-  local lines = {name .. " " .. current .. "/300（純文字採集指南）"}
-  if current >= 300 then return lines[1] .. "\n已達到預設目標。" end
-  for _, stage in ipairs(stages) do
+  local locale = self:GetLanguage()
+  local name = (professionNames[locale] or professionNames.enUS)[skillID]
+  local lines = {self:T("GATHERING_HEADER", name, current)}
+  if current >= 300 then return lines[1] .. "\n" .. self:T("TARGET_REACHED") end
+  for index, stage in ipairs(stages) do
     if stage[2] > current then
-      lines[#lines+1] = string.format("%d～%d：%s", math.max(stage[1],current), stage[2],stage[3])
-      lines[#lines+1] = "  建議區域：" .. stage[4]
+      local names, zones = stage[3], stage[4]
+      if locale == "enUS" and english[skillID] and english[skillID][index] then
+        names, zones = english[skillID][index][1], english[skillID][index][2]
+      end
+      lines[#lines+1] = string.format("%d-%d: %s", math.max(stage[1], current), stage[2], names)
+      lines[#lines+1] = self:T("GATHERING_ZONE", zones)
     end
   end
-  lines[#lines+1] = "技能上限達 75／150／225 前，記得找專業訓練師提升上限。"
-  lines[#lines+1] = "區域為參考建議；採集點與怪物分布需在永恆伺服器實際確認。"
+  lines[#lines+1] = self:T("GATHERING_TRAINER")
+  lines[#lines+1] = self:T("GATHERING_CAUTION")
   if skillID == 186 then
-    lines[#lines+1] = "採礦：熔煉也可提升技能，配方與可用爐具請以遊戲內顯示為準。"
+    lines[#lines+1] = self:T("MINING_NOTE")
   elseif skillID == 393 then
-    lines[#lines+1] = "剝皮：技能 100 以上通常可剝取最高約技能／5 等級的野獸（Classic 規則，永恆待驗證）。"
+    lines[#lines+1] = self:T("SKINNING_NOTE")
   end
   return table.concat(lines, "\n")
 end
