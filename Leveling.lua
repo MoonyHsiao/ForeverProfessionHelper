@@ -71,6 +71,34 @@ local function Score(recipe, stock, producedStock, byItem, level)
     chance = chance, expectedGain = gain, missing = estimate.shopping,
     color = estimate.mainColor or color, tier = (estimate.mainColor or color) == "green" and 1 or 0 }
 end
+-- Candidate lists are stable for a given profession/skill level. Build them
+-- once; changing stock/prices never requires rescanning all recipe metadata.
+local candidateIndex = {}
+function A:GetLevelingCandidates(skillID, recipes, level)
+  skillID = tonumber(skillID)
+  local bucket = candidateIndex[skillID]
+  if not bucket or bucket.source ~= recipes then
+    bucket = {source = recipes, levels = {}}
+    candidateIndex[skillID] = bucket
+  end
+  local key = math.floor(level)
+  local candidates = bucket.levels[key]
+  if candidates then return candidates end
+  candidates = {}
+  for _, recipe in ipairs(recipes) do
+    if recipe.trainer and not recipe.hidden and not recipe.requiredSpec then
+      local required = self.GetOneForAllSkillThresholds
+        and self:GetOneForAllSkillThresholds(recipe.skillID, recipe.id)
+      local minSkill = required and required[1] or recipe.requiredSkill
+      if minSkill and minSkill <= key and SkillChance(recipe, key) then
+        candidates[#candidates + 1] = recipe
+      end
+    end
+  end
+  bucket.levels[key] = candidates
+  return candidates
+end
+
 function A:PlanProfession(skillID, target, progressYield)
   if not self.recipeDatabaseReady then return nil, self:T("PLAN_DB") end
   local skill = self:Character().professions[tonumber(skillID)]
@@ -88,7 +116,7 @@ function A:PlanProfession(skillID, target, progressYield)
   local maxSteps = 300
   while current < target and steps < maxSteps do
     local best, bestScore
-    for _, recipe in ipairs(recipes) do
+    for _, recipe in ipairs(self:GetLevelingCandidates(skillID, recipes, current)) do
       if steps == 0 and recipe.trainer and not recipe.hidden and not recipe.requiredSpec then
         diagnostic.trainer = diagnostic.trainer + 1
         if (recipe.requiredSkill or 9999) <= current then
@@ -176,9 +204,8 @@ function A:PlanProfession(skillID, target, progressYield)
     end)(),
   }
 end
-function A:PlanSummary(skillID, target, progressYield)
-  local result, err = self:PlanProfession(skillID, target, progressYield)
-  if not result then return err end
+function A:RenderPlanSummary(skillID, result)
+  if not result then return self:T("PLAN_DB") end
   local textLines = {
     self:T("PLAN_HEADER", tostring(skillID), result.from, math.floor(result.to), result.target),
     self:T("PLAN_DISCLAIMER"),
@@ -268,6 +295,12 @@ function A:PlanSummary(skillID, target, progressYield)
     textLines[#textLines + 1] = self:T("PRICE_NOTE", #result.unknownPrices)
   end
   return table.concat(textLines, "\n")
+end
+
+function A:PlanSummary(skillID, target, progressYield)
+  local result, err = self:PlanProfession(skillID, target, progressYield)
+  if not result then return err end
+  return self:RenderPlanSummary(skillID, result)
 end
 
 -- Choose a profession by ID from /fph plan <skillID>, or cycle in UI.
