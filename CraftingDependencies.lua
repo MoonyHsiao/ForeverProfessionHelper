@@ -10,6 +10,10 @@ local function CopyMap(source)
   return out
 end
 local function CopyState(s)
+  local sequence = {}
+  for i, event in ipairs(s.sequence or {}) do
+    sequence[i] = { recipe = event.recipe, gain = event.gain }
+  end
   local preparations = {}
   for id, row in pairs(s.preparations or {}) do
     preparations[id] = { recipe = row.recipe, crafts = row.crafts, expectedGain = row.expectedGain or 0 }
@@ -20,6 +24,7 @@ local function CopyState(s)
     shopping = CopyMap(s.shopping),
     reused = CopyMap(s.reused),
     preparations = preparations,
+    sequence = sequence,
     cost = s.cost,
     unknown = s.unknown,
     skill = s.skill,
@@ -61,7 +66,7 @@ end
 function A:SimulateCraftInputs(recipe, times, initialStock, initialProduced, byItem, skillLevel)
   local state = {
     stock = CopyMap(initialStock), produced = CopyMap(initialProduced),
-    shopping = {}, reused = {}, preparations = {}, cost = 0, unknown = 0,
+    shopping = {}, reused = {}, preparations = {}, sequence = {}, cost = 0, unknown = 0,
     skill = tonumber(skillLevel) or 1,
     gainedFromPrep = 0, gainedFromMain = 0, mainColor = nil,
   }
@@ -100,8 +105,15 @@ function A:SimulateCraftInputs(recipe, times, initialStock, initialProduced, byI
             trial.stock[itemID] = trial.stock[itemID] - need
             trial.reused[itemID] = (trial.reused[itemID] or 0) + need
             trial.produced[itemID] = math.max(0, (trial.produced[itemID] or 0) - need)
+            -- Prerequisite crafts have leveling value as well as material
+            -- value: compare extra spending per expected skill point.
+            -- Keep unknown-price candidates below fully priced options.
+            local trialGain = math.max(0, trial.skill - s.skill)
+            local buyGain = math.max(0, buy.skill - s.skill)
+            local trialUnitCost = trial.cost / (1 + trialGain)
+            local buyUnitCost = buy.cost / (1 + buyGain)
             if trial.unknown < best.unknown or
-              (trial.unknown == best.unknown and trial.cost < best.cost) then
+              (trial.unknown == best.unknown and trialUnitCost < buyUnitCost) then
               best = trial
             end
           end
@@ -141,6 +153,7 @@ function A:SimulateCraftInputs(recipe, times, initialStock, initialProduced, byI
         record.crafts = record.crafts + 1
         record.expectedGain = record.expectedGain + gain
         s.preparations[id] = record
+        s.sequence[#s.sequence + 1] = { recipe = targetRecipe, gain = gain }
       end
     end
     return s
