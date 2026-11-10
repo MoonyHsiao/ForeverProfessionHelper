@@ -1,7 +1,7 @@
 local addonName, ns = ...
 local A = CreateFrame("Frame")
 ns.A = A
-A.version = "1.1.6-dev"
+A.version = "1.1.7-dev"
 A.listeners = {}
 
 function A:Print(message)
