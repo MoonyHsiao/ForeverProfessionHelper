@@ -20,15 +20,26 @@ end
 function A:GetPrice(itemID)
   return Copper(itemID)
 end
+-- Prefer Forever-specific thresholds from OneForAll. Fall back to
+-- LibProfessionDB difficulty data for recipes absent from the numeric dataset.
 local function SkillChance(recipe, level)
+  local color, required
+  if A.GetOneForAllSkillColor then
+    color, required = A:GetOneForAllSkillColor(recipe.skillID, recipe.id, level)
+  end
+  if color == "locked" or color == "gray" then return nil end
+  if color == "orange" then return 1.0, "orange" end
+  if color == "yellow" then return 0.75, "yellow" end
+  if color == "green" then return 0.25, "green" end
+
   local d = recipe.difficulty or {}
   local orange, yellow, green, grey = tonumber(d[1]), tonumber(d[2]), tonumber(d[3]), tonumber(d[4])
   if not orange or not yellow or not green or not grey then return nil end
-  if level < orange then return 1 end
-  if level < yellow then return 1 end
-  if level < green then return 0.65 end
-  if level < grey then return 0.3 end
-  return 0
+  if level < (recipe.requiredSkill or 1) then return nil end
+  if level < yellow then return 1.0, "orange" end
+  if level < green then return 0.75, "yellow" end
+  if level < grey then return 0.25, "green" end
+  return nil
 end
 local function Holdings(self)
   local stock = {}
@@ -42,10 +53,12 @@ local function Holdings(self)
   return stock
 end
 local function Score(recipe, stock, level)
-  local chance = SkillChance(recipe, level)
+  local chance, color = SkillChance(recipe, level)
   if not chance or chance == 0 then return nil end
   if recipe.hidden or recipe.requiredSpec or not recipe.trainer then return nil end
-  if (recipe.requiredSkill or 9999) > level then return nil end
+  local colors = A.GetOneForAllSkillThresholds and A:GetOneForAllSkillThresholds(recipe.skillID, recipe.id)
+  local required = colors and colors[1] or recipe.requiredSkill
+  if (required or 9999) > level then return nil end
   local total, unknown, missing = 0, 0, {}
   for id, qty in pairs(recipe.reagents) do
     local deficit = math.max(0, qty - (stock[id] or 0))
@@ -59,7 +72,8 @@ local function Score(recipe, stock, level)
       else total = total + price * deficit end
     end
   end
-  return { cost = total / chance, unknown = unknown, chance = chance, missing = missing }
+  return { cost = total / chance, unknown = unknown, chance = chance, missing = missing,
+    color = color, tier = color == "green" and 1 or 0 }
 end
 function A:PlanProfession(skillID, target)
   if not self.recipeDatabaseReady then return nil, self:T("PLAN_DB") end
@@ -71,6 +85,7 @@ function A:PlanProfession(skillID, target)
   if #recipes == 0 then return nil, self:T("PLAN_NO_RECIPES") end
   local stock = Holdings(self)
   local lines, shopping, steps, unresolved = {}, {}, 0, false
+  local usedGreen = false
   local diagnostic = { available = #recipes, trainer = 0, learnable = 0, difficultyUnknown = 0 }
   local maxSteps = 300
   while current < target and steps < maxSteps do
@@ -88,14 +103,16 @@ function A:PlanProfession(skillID, target)
       local score = Score(recipe, stock, current)
       if score then
         -- Unknown prices are a fallback, not a reason to hide every recipe.
-        if not bestScore or score.unknown < bestScore.unknown
-          or (score.unknown == bestScore.unknown and score.cost < bestScore.cost) then
+        if not bestScore or score.tier < bestScore.tier
+          or (score.tier == bestScore.tier and score.unknown < bestScore.unknown)
+          or (score.tier == bestScore.tier and score.unknown == bestScore.unknown and score.cost < bestScore.cost) then
           best, bestScore = recipe, score
         end
       end
     end
     if not best then break end
     if bestScore.unknown > 0 then unresolved = true end
+    if bestScore.color == "green" then usedGreen = true end
     local times = math.max(1, math.ceil(1 / bestScore.chance))
     local start = current
     for _ = 1, times do
@@ -116,6 +133,7 @@ function A:PlanProfession(skillID, target)
       lines[#lines + 1] = {
         from = start, to = current, crafts = times, recipe = best,
         estimatedCostPerSkill = bestScore.cost,
+        color = bestScore.color,
       }
     end
   end
@@ -132,6 +150,7 @@ function A:PlanProfession(skillID, target)
     unknownPrices = unknownPrices,
     approximate = true, incomplete = current < target, missingPrices = unresolved,
     diagnostics = diagnostic,
+    usedGreen = usedGreen,
   }
 end
 function A:PlanSummary(skillID, target)
@@ -143,8 +162,8 @@ function A:PlanSummary(skillID, target)
   }
   for i, stage in ipairs(result.lines) do
     local r = stage.recipe
-    textLines[#textLines + 1] = string.format("%d～%d：%s ×%d",
-      stage.from, stage.to, r.name, stage.crafts)
+    textLines[#textLines + 1] = string.format("%d～%d：%s ×%d [%s]",
+      stage.from, stage.to, r.name, stage.crafts, self:T("COLOR_" .. string.upper(stage.color or "unknown")))
     local learned = self:RecipeLearned(r.id)
     if learned == true then
       textLines[#textLines + 1] = self:T("LEARNED")
@@ -173,6 +192,7 @@ function A:PlanSummary(skillID, target)
       break
     end
   end
+  if result.usedGreen then textLines[#textLines + 1] = self:T("GREEN_FALLBACK") end
   if result.incomplete then
     textLines[#textLines + 1] = self:T("PLAN_INCOMPLETE")
     local d = result.diagnostics or {}
