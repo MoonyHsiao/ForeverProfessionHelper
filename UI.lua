@@ -10,6 +10,7 @@ end
 function A:BuildOverview()
   local lines = {
     "伺服器：" .. self:Realm(),
+    "配方資料庫：" .. (self.recipeDatabaseReady and ("已載入 " .. tostring(self.recipeDatabaseStatus) .. " 個配方") or ("未就緒：" .. tostring(self.recipeDatabaseStatus or "未知"))),
     "此版本為開發測試版。未知用途材料不會標示為可賣。",
     "",
     "已記錄角色與專業：",
@@ -44,7 +45,7 @@ function A:ShowWindow()
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     title:SetPoint("TOP", frame, "TOP", 0, -6)
-    title:SetText("永恆專業助手 0.1.0")
+    title:SetText("永恆專業助手 0.2.0")
     local scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 18, -40)
     scroll:SetPoint("BOTTOMRIGHT", -34, 48)
