@@ -3,6 +3,7 @@ local A = ns.A
 local frame, body, activeMode, title, scanButton, cycleButton, languageButton, languageMenu, professionMenu = nil, nil, "inventory"
 local tabs = {}
 local UpdateView
+local routeScroll, routeContent, routeRows, routeHeader, routeFooter = nil, nil, {}, nil, nil
 -- The three tabs only read saved inventory or the offline static route.
 local function SelectTab(mode)
   activeMode = mode
@@ -73,6 +74,128 @@ function A:BuildInventoryView()
   return table.concat(lines, "\n")
 end
 
+-- Show game-native details where the client supports them. Some crafting
+-- spells have no item output (enchanting); use a spell tooltip or a readable
+-- fallback with the LibProfessionDB ingredient list.
+local function ShowRecipeTooltip(button, stage)
+  if not GameTooltip or not stage then return end
+  GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+  local recipe = stage.recipe
+  local itemID = recipe and tonumber(recipe.craftedItemId)
+  if not itemID and A.GetOneForAllCraftOutput then
+    itemID = A:GetOneForAllCraftOutput(stage.spell)
+  end
+  local shown = false
+  if itemID and GameTooltip.SetHyperlink then
+    shown = pcall(GameTooltip.SetHyperlink, GameTooltip, "item:" .. itemID)
+  end
+  if not shown and stage.spell and GameTooltip.SetSpellByID then
+    shown = pcall(GameTooltip.SetSpellByID, GameTooltip, stage.spell)
+  end
+  if not shown then
+    GameTooltip:ClearLines()
+    GameTooltip:AddLine(stage.name or tostring(stage.spell), 1, 0.82, 0.1)
+  end
+  if recipe and type(recipe.reagents) == "table" and next(recipe.reagents) then
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine(A:T("TOOLTIP_REAGENTS"), 1, 0.82, 0.1)
+    local ids = {}
+    for id in pairs(recipe.reagents) do ids[#ids + 1] = id end
+    table.sort(ids)
+    for _, id in ipairs(ids) do
+      local name = (GetItemInfo and GetItemInfo(id)) or A:T("ITEM_FALLBACK", id)
+      GameTooltip:AddLine(string.format("  %s x%d", name, recipe.reagents[id]), 1, 1, 1)
+    end
+  end
+  GameTooltip:Show()
+end
+
+local function RenderInteractiveRoute(sections)
+  if not routeScroll or not routeContent then return end
+  local stages = sections.stages or {}
+  local hasRows = #stages > 0
+  if not hasRows then
+    routeScroll:Hide()
+    return false
+  end
+
+  local y = 8
+  local headerText = (sections.professionName or "") .. " "
+    .. tostring(sections.currentSkill or 0) .. "/300"
+  if sections.skillCapNotice then
+    headerText = headerText .. "\n|cffff6644" .. sections.skillCapNotice .. "|r"
+  end
+  headerText = headerText .. "\n" .. A:T("PLAN_DISCLAIMER")
+    .. "\n" .. A:T("RECIPE_TOOLTIP_HINT")
+  routeHeader:SetText(headerText)
+  local headerHeight = math.max(65, routeHeader:GetStringHeight() + 12)
+  routeHeader:SetHeight(headerHeight)
+  y = y + headerHeight + 6
+
+  local limit = math.min(35, #stages)
+  for i = 1, limit do
+    local stage = stages[i]
+    local row = routeRows[i]
+    if not row then
+      row = CreateFrame("Button", nil, routeContent)
+      row:SetWidth(480)
+      row:SetPoint("TOPLEFT", routeContent, "TOPLEFT", 3, 0)
+      row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+      row.text:SetPoint("TOPLEFT", 11, -8)
+      row.text:SetWidth(452)
+      row.text:SetJustifyH("LEFT")
+      row.text:SetJustifyV("TOP")
+      local background = row:CreateTexture(nil, "BACKGROUND")
+      background:SetAllPoints()
+      row.background = background
+      local highlight = row:CreateTexture(nil, "HIGHLIGHT")
+      highlight:SetAllPoints()
+      highlight:SetColorTexture(1, 1, 1, 0.09)
+      routeRows[i] = row
+    end
+    local title = string.format("%d-%d: %s x%d [%s]",
+      math.floor(stage.from), math.floor(stage.to), stage.name, stage.crafts,
+      A:T("COLOR_" .. stage.color))
+    local lines = {}
+    if i == 1 then
+      lines[#lines + 1] = "|cff55ff88" .. A:T("CURRENT_RECIPE") .. "|r"
+    end
+    lines[#lines + 1] = title
+    for _, entry in ipairs(stage.preparations or {}) do
+      local name = (GetSpellInfo and GetSpellInfo(entry.id)) or tostring(entry.id)
+      lines[#lines + 1] = A:T("CRAFT_PREREQUISITE_GAIN", name, entry.count, entry.expected)
+    end
+    row.text:SetText(table.concat(lines, "\n"))
+    local height = math.max(36, row.text:GetStringHeight() + 17)
+    row:SetHeight(height)
+    row:ClearAllPoints()
+    row:SetPoint("TOPLEFT", routeContent, "TOPLEFT", 3, -y)
+    if i == 1 then
+      row.background:SetColorTexture(0.08, 0.33, 0.17, 0.48)
+    else
+      row.background:SetColorTexture(0.12, 0.12, 0.12, 0.40)
+    end
+    row:SetScript("OnEnter", function(self) ShowRecipeTooltip(self, stage) end)
+    row:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+    row:Show()
+    y = y + height + 5
+  end
+  for i = limit + 1, #routeRows do routeRows[i]:Hide() end
+
+  local footerLines = {}
+  if #stages > 35 then footerLines[#footerLines + 1] = A:T("MORE_STAGES") end
+  if (sections.projectedSkill or 0) < 300 then
+    footerLines[#footerLines + 1] = A:T("PLAN_INCOMPLETE")
+  end
+  routeFooter:SetText(table.concat(footerLines, "\n"))
+  routeFooter:SetHeight(math.max(1, routeFooter:GetStringHeight() + 4))
+  routeFooter:ClearAllPoints()
+  routeFooter:SetPoint("TOPLEFT", routeContent, "TOPLEFT", 8, -y)
+  routeContent:SetHeight(math.max(1, y + routeFooter:GetHeight() + 18))
+  routeScroll:Show()
+  return true
+end
+
 function A:ShowWindow(showPlan)
   if not self.initialized then return end
   if not frame then
@@ -102,6 +225,22 @@ function A:ShowWindow(showPlan)
     body:SetAutoFocus(false)
     body:SetScript("OnEscapePressed", function() frame:Hide() end)
     scroll:SetScrollChild(body)
+    routeScroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+    routeScroll:SetPoint("TOPLEFT", scroll, "TOPLEFT", 0, 0)
+    routeScroll:SetPoint("BOTTOMRIGHT", scroll, "BOTTOMRIGHT", 0, 0)
+    routeContent = CreateFrame("Frame", nil, routeScroll)
+    routeContent:SetWidth(480)
+    routeContent:SetHeight(1)
+    routeScroll:SetScrollChild(routeContent)
+    routeHeader = routeContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    routeHeader:SetPoint("TOPLEFT", routeContent, "TOPLEFT", 9, -8)
+    routeHeader:SetWidth(465)
+    routeHeader:SetJustifyH("LEFT")
+    routeHeader:SetJustifyV("TOP")
+    routeFooter = routeContent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    routeFooter:SetWidth(465)
+    routeFooter:SetJustifyH("LEFT")
+    routeScroll:Hide()
     local tabModes = {"route", "materials", "inventory"}
     local tabKeys = {route = "TAB_ROUTE", materials = "TAB_MATERIALS",
       inventory = "TAB_INVENTORY"}
@@ -120,10 +259,18 @@ function A:ShowWindow(showPlan)
           .. A:T(tabKeys[mode]) .. (selected and "|r" or ""))
       end
       if activeMode == "inventory" then
+        routeScroll:Hide()
+        scroll:Show()
         body:SetText(A:BuildInventoryView())
       else
         local sections = A:GetStaticPlanSections(A.selectedProfessionID)
-        body:SetText(sections[activeMode] or sections.route)
+        if activeMode == "route" and RenderInteractiveRoute(sections) then
+          scroll:Hide()
+        else
+          routeScroll:Hide()
+          scroll:Show()
+          body:SetText(sections[activeMode] or sections.route)
+        end
       end
     end
     scanButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
