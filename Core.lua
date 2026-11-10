@@ -1,7 +1,7 @@
 local addonName, ns = ...
 local A = CreateFrame("Frame")
 ns.A = A
-A.version = "1.1.4-dev"
+A.version = "1.1.5-dev"
 A.listeners = {}
 
 function A:Print(message)
@@ -53,7 +53,6 @@ function A:Initialize()
   self:ScanProfessions()
   self:LoadRecipeDatabase()
   self:ScanBags()
-  self:PreparePlanCache()
   self:Print(self:T("LOAD_MESSAGE"))
 end
 
@@ -101,7 +100,6 @@ SlashCmdList.FOREVERPROFESSIONHELPER = function(message)
     A:Print(A:T("LANGUAGE") .. ": " .. (A.languageNames[A.db.language or "auto"] or "Auto"))
   elseif message == "db" then
     local ready, status = A:LoadRecipeDatabase()
-    A:InvalidatePlanCache("database")
     A:Print(A:T("CHAT_DB", tostring(status)))
     A:Print(A:T("CHAT_PARSED", A.recipeCount or 0, A.reagentCount or 0))
     local ids = {}
