@@ -14,9 +14,19 @@ function A:ScanProfessions()
     end
   end
   local ch = self:Character()
+  local changed = false
+  for id, prof in pairs(found) do
+    local old = (ch.professions or {})[id]
+    if not old or old.rank ~= prof.rank or old.max ~= prof.max then changed = true; break end
+  end
+  if not changed then
+    for id in pairs(ch.professions or {}) do
+      if not found[id] then changed = true; break end
+    end
+  end
   ch.professions = found
   ch.professionUpdated = self:Time()
-  self:Notify("professions")
+  if changed then self:Notify("professions") end
 end
 -- Only records recipe ingredients actually exposed by the client.
 -- It is NOT a complete 1–300 catalog.
