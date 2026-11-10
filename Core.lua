@@ -85,7 +85,9 @@ SLASH_FOREVERPROFESSIONHELPER1 = "/fph"
 SlashCmdList.FOREVERPROFESSIONHELPER = function(message)
   message = (message or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
   if not A.initialized then return end
-  if message == "plan" then
+  if message == "plan" or message:match("^plan%s+%d+$") then
+    local skillID = tonumber(message:match("^plan%s+(%d+)$"))
+    if skillID then A.selectedProfessionID = skillID end
     A:ShowWindow(true)
   elseif message == "db" then
     local ready, status = A:LoadRecipeDatabase()
@@ -102,7 +104,7 @@ SlashCmdList.FOREVERPROFESSIONHELPER = function(message)
     A:ScanKnownRecipes()
     A:Print("已重新掃描當前可讀資料。")
   elseif message == "help" then
-    A:Print("/fph 開啟視窗；/fph scan 重新掃描；/fph help 顯示指令。")
+    A:Print("/fph 開啟視窗；/fph plan [專業ID] 升級推薦；/fph db 配方狀態；/fph scan 重新掃描。")
   else
     A:ShowWindow()
   end
