@@ -20,14 +20,54 @@ local FALLBACK = {
     Horde = "奧格瑪：Karolek；幽暗城：Arthur Moore；雷霆崖：Una",
   },
 }
+local EN_NPCS = {
+  ["Simon Tanner"] = "Stormwind / Old Town",
+  ["Fimble Finespindle"] = "Ironforge",
+  ["Telonis"] = "Darnassus / Craftsmen's Terrace",
+  ["Drakk Stonehand"] = "The Hinterlands / Aerie Peak",
+  ["Nadyia Maneweaver"] = "Teldrassil",
+  ["Adele Fielder"] = "Elwynn Forest / Goldshire",
+  ["Karolek"] = "Orgrimmar",
+  ["Arthur Moore"] = "Undercity",
+  ["Una"] = "Thunder Bluff",
+}
+local CN_NPCS = {
+  ["Simon Tanner"] = "暴风城／旧城区",
+  ["Fimble Finespindle"] = "铁炉堡",
+  ["Telonis"] = "达纳苏斯／工匠区",
+  ["Drakk Stonehand"] = "辛特兰／鹰巢山",
+  ["Nadyia Maneweaver"] = "泰达希尔",
+  ["Adele Fielder"] = "艾尔文森林／闪金镇",
+  ["Karolek"] = "奥格瑞玛",
+  ["Arthur Moore"] = "幽暗城",
+  ["Una"] = "雷霆崖",
+}
+local FALLBACK_EN = {
+  Alliance = "Stormwind: Simon Tanner (Old Town); Ironforge: Fimble Finespindle; Darnassus: Telonis",
+  Horde = "Orgrimmar: Karolek; Undercity: Arthur Moore; Thunder Bluff: Una",
+}
+local FALLBACK_CN = {
+  Alliance = "暴风城：Simon Tanner（旧城区）；铁炉堡：Fimble Finespindle；达纳苏斯：Telonis",
+  Horde = "奥格瑞玛：Karolek；幽暗城：Arthur Moore；雷霆崖：Una",
+}
 function A:TrainerLocation(skillID, npcName)
   local entry = npcName and NPCS[npcName]
-  if entry then return self:T("TRAINER_LOCATION_CLASSIC", entry[1], entry[2]) end
+  if entry then
+    local locale = self:GetLanguage()
+    local zone = entry[1]
+    if locale == "enUS" then zone = EN_NPCS[npcName] or zone
+    elseif locale == "zhCN" then zone = CN_NPCS[npcName] or zone end
+    return self:T("TRAINER_LOCATION_CLASSIC", zone, entry[2])
+  end
   return self:T("TRAINER_LOCATION_MISSING")
 end
 function A:TrainerFallback(skillID)
   local faction = UnitFactionGroup and UnitFactionGroup("player")
-  return FALLBACK[tonumber(skillID)] and FALLBACK[tonumber(skillID)][faction] or nil
+  if tonumber(skillID) ~= 165 then return nil end
+  local locale = self:GetLanguage()
+  if locale == "enUS" then return FALLBACK_EN[faction]
+  elseif locale == "zhCN" then return FALLBACK_CN[faction] end
+  return FALLBACK[165][faction]
 end
 
 function A:RecipeLearned(spellID)
