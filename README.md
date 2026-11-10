@@ -4,7 +4,7 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development branch — v1.1.1-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, cost estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+> **Development branch — v1.1.2-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, cost estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
 
 ## Branches and versioning
 
@@ -98,7 +98,7 @@ Example: **Fine Leather Belt (item 4246) → Dark Leather Belt**. Belts crafted 
 
 The planner now compares direct acquisition against recursively crafting intermediate reagents, using up to three dependency levels. Intermediate crafts are shown before the stage that consumes them. The recipe output mapping comes from OneForAll Forever for recipes whose LibProfessionDB crafted-item ID is absent. The planner still uses local greedy decisions; it is not yet a globally optimized route. It assumes one crafted item per operation unless recipe yield metadata is explicitly provided, and it only credits outputs with a valid crafted item ID.
 
-Prerequisite crafts are not credited as skill-ups; the actual skill curve may therefore differ. When prices are unknown, comparisons are provisional. See [PLANNER_TEST_CASES.md](PLANNER_TEST_CASES.md) for the expected belt example. Changes in `develop` are not included in stable `main` until merged.
+Prerequisite crafts now contribute **estimated skill gains** before the parent recipe is simulated. The planner reevaluates later recipes using the updated projected skill, and lists expected skill gains next to prerequisite crafts. Yellow/green gains remain probability-based estimates, not guaranteed results. When prices are unknown, comparisons are provisional. The make-versus-buy heuristic compares material expense against estimated skill gains, but is not globally optimal. Cross-profession crafting is deliberately excluded: prerequisites must belong to the selected profession. An isolated Lua regression script is available at `tests/planner_prerequisites.lua` (not loaded by WoW). See [PLANNER_TEST_CASES.md](PLANNER_TEST_CASES.md) for the expected belt example. Changes in `develop` are not included in stable `main` until merged.
 
 ## Recipe colors and OneForAll data
 
