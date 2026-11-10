@@ -217,6 +217,37 @@ function A:T(key, ...)
   return ok and output or template
 end
 
+
+-- Resolve profession labels by skill-line ID rather than persisting only the
+-- game's localized name. Works for both current and offline character snapshots.
+local professions = {
+  enUS = {
+    [129]="First Aid", [164]="Blacksmithing", [165]="Leatherworking",
+    [171]="Alchemy", [182]="Herbalism", [185]="Cooking",
+    [186]="Mining", [197]="Tailoring", [202]="Engineering",
+    [333]="Enchanting", [356]="Fishing", [393]="Skinning",
+    [633]="Lockpicking", [755]="Jewelcrafting", [773]="Inscription",
+  },
+  zhTW = {
+    [129]="急救", [164]="鍛造", [165]="製皮",
+    [171]="鍊金術", [182]="草藥學", [185]="烹飪",
+    [186]="採礦", [197]="裁縫", [202]="工程學",
+    [333]="附魔", [356]="釣魚", [393]="剝皮",
+    [633]="開鎖", [755]="珠寶設計", [773]="銘文學",
+  },
+  zhCN = {
+    [129]="急救", [164]="锻造", [165]="制皮",
+    [171]="炼金术", [182]="草药学", [185]="烹饪",
+    [186]="采矿", [197]="裁缝", [202]="工程学",
+    [333]="附魔", [356]="钓鱼", [393]="剥皮",
+    [633]="开锁", [755]="珠宝加工", [773]="铭文",
+  },
+}
+function A:ProfessionName(skillID, fallback)
+  local names = professions[self:GetLanguage()] or professions.enUS
+  return names[tonumber(skillID)] or fallback or tostring(skillID)
+end
+
 function A:SetLanguage(code)
   if not self.db or (code ~= "auto" and not dictionaries[code]) then return end
   self.db.language = code
