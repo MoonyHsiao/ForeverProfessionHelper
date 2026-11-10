@@ -12,7 +12,7 @@ end
 local function CopyState(s)
   local preparations = {}
   for id, row in pairs(s.preparations or {}) do
-    preparations[id] = { recipe = row.recipe, crafts = row.crafts }
+    preparations[id] = { recipe = row.recipe, crafts = row.crafts, expectedGain = row.expectedGain or 0 }
   end
   return {
     stock = CopyMap(s.stock),
@@ -22,6 +22,10 @@ local function CopyState(s)
     preparations = preparations,
     cost = s.cost,
     unknown = s.unknown,
+    skill = s.skill,
+    gainedFromPrep = s.gainedFromPrep,
+    gainedFromMain = s.gainedFromMain,
+    mainColor = s.mainColor,
   }
 end
 local function Price(itemID)
@@ -58,6 +62,8 @@ function A:SimulateCraftInputs(recipe, times, initialStock, initialProduced, byI
   local state = {
     stock = CopyMap(initialStock), produced = CopyMap(initialProduced),
     shopping = {}, reused = {}, preparations = {}, cost = 0, unknown = 0,
+    skill = tonumber(skillLevel) or 1,
+    gainedFromPrep = 0, gainedFromMain = 0, mainColor = nil,
   }
   local acquire, craft
   acquire = function(s, itemID, need, depth, active)
@@ -83,7 +89,7 @@ function A:SimulateCraftInputs(recipe, times, initialStock, initialProduced, byI
     -- recipes; never choose a producer with only a vendor/drop recipe source.
     if depth < 3 and not active[itemID] then
       for _, producer in ipairs((byItem and byItem[itemID]) or {}) do
-        if ProducerValid(producer, skillLevel) then
+        if ProducerValid(producer, s.skill) then
           local count = math.max(1, math.floor(tonumber(producer.craftedQuantity) or 1))
           local operations = math.ceil(need / count)
           local trial = CopyState(s)
@@ -109,6 +115,20 @@ function A:SimulateCraftInputs(recipe, times, initialStock, initialProduced, byI
       for id, quantity in pairs(targetRecipe.reagents or {}) do
         s = acquire(s, id, quantity, depth, active)
       end
+      -- Prerequisites are crafted BEFORE the parent recipe. They may award
+      -- skill points, affecting the color/chance of every subsequent craft.
+      local probability, color
+      if A.EstimateSkillChance then
+        probability, color = A:EstimateSkillChance(targetRecipe, math.floor(s.skill))
+      end
+      local gain = probability or 0
+      s.skill = s.skill + gain
+      if preparation then
+        s.gainedFromPrep = s.gainedFromPrep + gain
+      else
+        s.gainedFromMain = s.gainedFromMain + gain
+        s.mainColor = color or "unknown"
+      end
       local resultID = tonumber(targetRecipe.craftedItemId)
       if resultID and resultID > 0 then
         local count = math.max(1, math.floor(tonumber(targetRecipe.craftedQuantity) or 1))
@@ -117,8 +137,9 @@ function A:SimulateCraftInputs(recipe, times, initialStock, initialProduced, byI
       end
       if preparation then
         local id = targetRecipe.id
-        local record = s.preparations[id] or { recipe = targetRecipe, crafts = 0 }
+        local record = s.preparations[id] or { recipe = targetRecipe, crafts = 0, expectedGain = 0 }
         record.crafts = record.crafts + 1
+        record.expectedGain = record.expectedGain + gain
         s.preparations[id] = record
       end
     end
