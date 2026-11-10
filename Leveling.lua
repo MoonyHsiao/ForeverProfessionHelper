@@ -132,6 +132,10 @@ function A:PlanProfession(skillID, target)
       last.crafts = last.crafts + times
       last.prepGain = (last.prepGain or 0) + simulated.gainedFromPrep
       last.mainGain = (last.mainGain or 0) + simulated.gainedFromMain
+      last.sequence = last.sequence or {}
+      for _, event in ipairs(simulated.sequence or {}) do
+        last.sequence[#last.sequence + 1] = event
+      end
       for recipeID, prep in pairs(simulated.preparations) do
         local entry = last.preparations[recipeID] or { recipe = prep.recipe, crafts = 0 }
         entry.crafts = entry.crafts + prep.crafts
@@ -144,6 +148,7 @@ function A:PlanProfession(skillID, target)
         estimatedCostPerSkill = bestScore.cost,
         color = bestScore.color,
         preparations = simulated.preparations,
+        sequence = simulated.sequence,
         prepGain = simulated.gainedFromPrep, mainGain = simulated.gainedFromMain,
       }
     end
@@ -178,13 +183,22 @@ function A:PlanSummary(skillID, target)
     self:T("PLAN_DISCLAIMER"),
   }
   for i, stage in ipairs(result.lines) do
-    local preps = {}
-    for _, preparation in pairs(stage.preparations or {}) do
-      preps[#preps + 1] = preparation
+    -- Show dependency crafts in execution order (nested prerequisites first).
+    -- Consecutive repeats are grouped without changing their order.
+    local ordered = {}
+    for _, event in ipairs(stage.sequence or {}) do
+      local last = ordered[#ordered]
+      if last and last.recipe.id == event.recipe.id then
+        last.crafts = last.crafts + 1
+        last.gain = last.gain + (event.gain or 0)
+      else
+        ordered[#ordered + 1] = {
+          recipe = event.recipe, crafts = 1, gain = event.gain or 0,
+        }
+      end
     end
-    table.sort(preps, function(a, b) return a.recipe.id < b.recipe.id end)
-    for _, prep in ipairs(preps) do
-      textLines[#textLines + 1] = self:T("CRAFT_PREREQUISITE_GAIN", prep.recipe.name, prep.crafts, prep.expectedGain or 0)
+    for _, prep in ipairs(ordered) do
+      textLines[#textLines + 1] = self:T("CRAFT_PREREQUISITE_GAIN", prep.recipe.name, prep.crafts, prep.gain)
     end
     local r = stage.recipe
     textLines[#textLines + 1] = string.format("%d～%d：%s ×%d [%s]",
