@@ -143,10 +143,31 @@ function A:PlanSummary(skillID, target)
   }
   for i, stage in ipairs(result.lines) do
     local r = stage.recipe
-    local trainer = #r.trainerNames > 0 and table.concat(r.trainerNames, "、") or "訓練師位置未確認"
-    if r.borrowedSources then trainer = trainer .. "（來源借用 Vanilla，待驗證）" end
-    textLines[#textLines + 1] = string.format("%d～%d：%s ×%d；%s",
-      stage.from, stage.to, r.name, stage.crafts, trainer)
+    textLines[#textLines + 1] = string.format("%d～%d：%s ×%d",
+      stage.from, stage.to, r.name, stage.crafts)
+    local learned = self:RecipeLearned(r.id)
+    if learned == true then
+      textLines[#textLines + 1] = "  已學會"
+    else
+      local state = learned == false and "尚未學會" or "尚未確認是否學會（開啟專業視窗可改善偵測）"
+      textLines[#textLines + 1] = "  " .. state .. "；訓練師配方"
+      textLines[#textLines + 1] = "  學習條件：專業技能至少 " .. tostring(r.requiredSkill or "未收錄")
+      local shown = 0
+      for _, name in ipairs(r.trainerNames or {}) do
+        textLines[#textLines + 1] = "  找 " .. name .. "： " .. self:TrainerLocation(r.skillID, name)
+        shown = shown + 1
+      end
+      if shown == 0 then
+        local fallback = self:TrainerFallback(r.skillID)
+        textLines[#textLines + 1] = "  無法確認此配方的指定訓練師。"
+        if fallback then
+          textLines[#textLines + 1] = "  可先詢問同專業訓練師：" .. fallback .. "（Classic 資料，不能保證教授此配方）"
+        end
+      end
+      if r.borrowedSources then
+        textLines[#textLines + 1] = "  注意：訓練師來源沿用 Vanilla，永恆版本尚未確認。"
+      end
+    end
     if i >= 35 then
       textLines[#textLines + 1] = "其餘階段未顯示；可提高專業等級後重新查看。"
       break
