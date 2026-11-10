@@ -118,8 +118,7 @@ function A:PreparePlanCache()
 end
 
 A:RegisterView("planCache", function(reason)
-  if reason == "bags" or reason == "bank" or reason == "professions"
-    or reason == "recipeDB" then
+  if reason == "professions" or reason == "recipeDB" then
     A:InvalidatePlanCache(reason)
   end
   -- planReady and language are presentation updates only.
