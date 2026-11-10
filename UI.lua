@@ -168,7 +168,7 @@ local function RenderInteractiveRoute(sections)
       lines[#lines + 1] = "|cffffaa55" .. stage.sourceNotice .. "|r"
     end
     for _, entry in ipairs(stage.preparations or {}) do
-      local name = (GetSpellInfo and GetSpellInfo(entry.id)) or tostring(entry.id)
+      local name = A:GetRecipeDisplayName(sections.professionID, entry.id)
       lines[#lines + 1] = A:T("CRAFT_PREREQUISITE_GAIN", name, entry.count, entry.expected)
     end
     row.text:SetText(table.concat(lines, "\n"))
