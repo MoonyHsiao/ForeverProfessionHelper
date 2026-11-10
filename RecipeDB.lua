@@ -141,7 +141,7 @@ function A:RecipeUsers(itemID)
       hasProfession = true
       if not coverage[skillID] and skillID ~= 182 and skillID ~= 393 and skillID ~= 356 then complete = false end
       if uses[skillID] then
-        users[#users + 1] = (skill.name or tostring(skillID)) .. " (" .. (ch.name or "?") .. ")"
+        users[#users + 1] = self:ProfessionName(skillID, skill.name) .. " (" .. (ch.name or "?") .. ")"
         found = true
       end
     end
