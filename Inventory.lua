@@ -16,6 +16,11 @@ local function readContainer(bag)
   end
   return counts
 end
+local function sameCounts(a, b)
+  for id, n in pairs(a or {}) do if (b or {})[id] ~= n then return false end end
+  for id, n in pairs(b or {}) do if (a or {})[id] ~= n then return false end end
+  return true
+end
 local function merge(target, source)
   for id, count in pairs(source) do target[id] = (target[id] or 0) + count end
 end
@@ -28,10 +33,11 @@ function A:ScanBags()
     merge(counts, source)
   end
   local ch = self:Character()
+  local changed = not ch.bagsScanned or not sameCounts(ch.bags, counts)
   ch.bags = counts
   ch.bagsScanned = true
   ch.bagUpdated = self:Time()
-  self:Notify("bags")
+  if changed then self:Notify("bags") end
 end
 function A:ScanBank()
   if not self.initialized or not self.bankOpen then return end
@@ -46,10 +52,11 @@ function A:ScanBank()
     merge(counts, source)
   end
   local ch = self:Character()
+  local changed = not ch.bankScanned or not sameCounts(ch.bank, counts)
   ch.bank = counts
   ch.bankScanned = true
   ch.bankUpdated = self:Time()
-  self:Notify("bank")
+  if changed then self:Notify("bank") end
 end
 function A:ItemHoldings(itemID)
   if not self.initialized then return {}, 0 end
