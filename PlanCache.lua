@@ -53,6 +53,17 @@ function A:GetStaticPlanSections(skillID)
     return {route = self:T("PLAN_DB"), materials = self:T("PLAN_DB")}
   end
 
+  local capNotice
+  local skillState = self:Character().professions[selected.id]
+  local rank = tonumber(selected.rank) or 0
+  local cap = skillState and tonumber(skillState.max) or 0
+  if cap == 75 or cap == 150 or cap == 225 then
+    if rank >= cap then
+      capNotice = self:T("SKILL_CAP_REACHED", cap)
+    elseif rank >= cap - 5 then
+      capNotice = self:T("SKILL_CAP_NEAR", cap - rank, cap)
+    end
+  end
   local index = RecipeIndex(selected.id)
   local current = tonumber(selected.rank) or 1
   local projected = current
@@ -122,6 +133,7 @@ function A:GetStaticPlanSections(skillID)
     self:T("PLAN_HEADER", tostring(selected.id), current, math.floor(projected), 300),
     self:T("PLAN_DISCLAIMER"),
   }
+  if capNotice then table.insert(lines, 2, capNotice) end
   for i, stage in ipairs(rows) do
     if i > 35 then
       lines[#lines + 1] = self:T("MORE_STAGES")
@@ -161,6 +173,12 @@ function A:GetStaticPlanSections(skillID)
   return {
     route = table.concat(lines, "\n"),
     materials = table.concat(materialLines, "\n"),
+    stages = rows,
+    skillCapNotice = capNotice,
+    professionName = selected.name,
+    currentSkill = current,
+    projectedSkill = projected,
+    professionID = selected.id,
   }
 end
 
