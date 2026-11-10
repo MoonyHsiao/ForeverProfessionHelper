@@ -1,7 +1,7 @@
 local addonName, ns = ...
 local A = CreateFrame("Frame")
 ns.A = A
-A.version = "0.2.0"
+A.version = "0.3.0"
 A.listeners = {}
 
 function A:Print(message)
@@ -85,7 +85,9 @@ SLASH_FOREVERPROFESSIONHELPER1 = "/fph"
 SlashCmdList.FOREVERPROFESSIONHELPER = function(message)
   message = (message or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
   if not A.initialized then return end
-  if message == "db" then
+  if message == "plan" then
+    A:ShowWindow(true)
+  elseif message == "db" then
     local ready, status = A:LoadRecipeDatabase()
     A:Print("配方資料庫：" .. (ready and "已載入 " or "無法載入：") .. tostring(status))
     A:Print("已解析配方 " .. tostring(A.recipeCount or 0) .. " 筆；材料關聯 " .. tostring(A.reagentCount or 0) .. " 筆")
