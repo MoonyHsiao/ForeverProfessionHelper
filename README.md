@@ -41,8 +41,9 @@ A table indicates that the library object is registered; `nil` indicates that it
 The addon defaults to **Auto**, which follows the language of the WoW client via `GetLocale()`.
 
 - In the addon window, click **Language** to cycle through **Auto → Traditional Chinese → Simplified Chinese → English**. The override is saved account-wide in SavedVariables and takes effect immediately.
+- You can also type `/fph lang enUS`, `/fph lang zhTW`, `/fph lang zhCN`, or `/fph lang auto`.
 - Client languages other than `zhTW`, `zhCN`, and `enUS` currently use English as the default.
-- Core UI, material/tooltips, leveling-plan labels, and guide instructions are localized. English gathering route names are included; some Simplified Chinese strings currently fall back to Traditional Chinese, and trainer names/recipe names originate from the game or LibProfessionDB and may not match the selected language.
+- Core UI, material/tooltips, leveling-plan labels, and guide instructions are localized. English gathering route names are included; Simplified Chinese gathering place and resource names may still use Traditional Chinese source data, and trainer names/recipe names originate from the game or LibProfessionDB and may not match the selected language.
 - Switching the addon language does not change the WoW client's language.
 
 ## OneForAll minimap button integration
@@ -69,6 +70,7 @@ Integration is based on the [OneForAll Forever 6.2.2 minimap collector](https://
 | `/fph plan 164` | Open the planner for a specific profession ID (164 = Blacksmithing). The UI also provides a profession-switch button. |
 | `/fph db` | Show library status, parsed recipe count, reagent links, and profession coverage. |
 | `/fph scan` | Rescan currently accessible bags, bank, and professions. |
+| `/fph lang [auto\|enUS\|zhTW\|zhCN]` | Change the addon language; omitting an argument cycles the choices. |
 | `/fph help` | Show available commands. |
 
 ## Features in the current development build
