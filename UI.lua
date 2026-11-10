@@ -1,13 +1,16 @@
 local _, ns = ...
 local A = ns.A
-local frame, body, activeMode, title, scanButton, cycleButton, languageButton, languageMenu, professionMenu = nil, nil, "overview"
--- The planner is prepared after login by PlanCache.lua. The buttons
--- only read cached results; they never run the recipe solver.
-local function CancelPlan() end
+local frame, body, activeMode, title, scanButton, cycleButton, languageButton, languageMenu, professionMenu = nil, nil, "inventory"
+local tabs = {}
+local UpdateView
+-- The three tabs only read saved inventory or the offline static route.
+local function SelectTab(mode)
+  activeMode = mode
+  if UpdateView then UpdateView() end
+end
 local function StartPlan()
-  if not frame or not body then return end
-  activeMode = "plan"
-  body:SetText(A:GetCachedPrimaryPlanText(A.selectedProfessionID))
+  if activeMode ~= "materials" then activeMode = "route" end
+  if UpdateView then UpdateView() end
 end
 local function sortedKeys(map)
   local keys = {}
@@ -39,6 +42,37 @@ function A:BuildOverview()
   lines[#lines + 1] = self:T("OVERVIEW_NOTE")
   return table.concat(lines, "\n")
 end
+function A:BuildInventoryView()
+  local lines = {self:BuildOverview(), "", self:T("INVENTORY_TAB_HEADER")}
+  local any = false
+  for _, charID in ipairs(sortedKeys(self:Store().characters)) do
+    local ch = self:Store().characters[charID]
+    local ids = {}
+    local union = {}
+    for id in pairs(ch.bags or {}) do union[tonumber(id) or id] = true end
+    for id in pairs(ch.bank or {}) do union[tonumber(id) or id] = true end
+    for id in pairs(union) do ids[#ids + 1] = id end
+    table.sort(ids)
+    if #ids > 0 then
+      any = true
+      lines[#lines + 1] = ""
+      lines[#lines + 1] = (ch.name or charID) .. " (" .. tostring(#ids) .. ")"
+      for i, id in ipairs(ids) do
+        local bagCount, bankCount = (ch.bags or {})[id] or 0, (ch.bank or {})[id] or 0
+        local itemName = (GetItemInfo and GetItemInfo(id)) or self:T("ITEM_FALLBACK", id)
+        lines[#lines + 1] = string.format("  %s: %s", itemName,
+          self:T("INVENTORY_LINE", bagCount, bankCount))
+        if i >= 100 then
+          lines[#lines + 1] = self:T("INVENTORY_TAB_MORE")
+          break
+        end
+      end
+    end
+  end
+  if not any then lines[#lines + 1] = self:T("INVENTORY_TAB_EMPTY") end
+  return table.concat(lines, "\n")
+end
+
 function A:ShowWindow(showPlan)
   if not self.initialized then return end
   if not frame then
@@ -54,7 +88,7 @@ function A:ShowWindow(showPlan)
     title:SetPoint("TOP", frame, "TOP", 0, -6)
     title:SetText(A:T("TITLE") .. " " .. A.version)
     local scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 18, -40)
+    scroll:SetPoint("TOPLEFT", 18, -79)
     scroll:SetPoint("BOTTOMRIGHT", -34, 48)
     body = CreateFrame("EditBox", nil, scroll)
     body:SetMultiLine(true)
@@ -68,6 +102,30 @@ function A:ShowWindow(showPlan)
     body:SetAutoFocus(false)
     body:SetScript("OnEscapePressed", function() frame:Hide() end)
     scroll:SetScrollChild(body)
+    local tabModes = {"route", "materials", "inventory"}
+    local tabKeys = {route = "TAB_ROUTE", materials = "TAB_MATERIALS",
+      inventory = "TAB_INVENTORY"}
+    for i, mode in ipairs(tabModes) do
+      local tab = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+      tab:SetSize(150, 25)
+      tab:SetPoint("TOPLEFT", frame, "TOPLEFT", 19 + (i - 1) * 157, -38)
+      tab:SetScript("OnClick", function() SelectTab(mode) end)
+      tabs[mode] = tab
+    end
+    UpdateView = function()
+      if not frame or not body then return end
+      for mode, tab in pairs(tabs) do
+        local selected = mode == activeMode
+        tab:SetText((selected and "|cff55ccaa" or "")
+          .. A:T(tabKeys[mode]) .. (selected and "|r" or ""))
+      end
+      if activeMode == "inventory" then
+        body:SetText(A:BuildInventoryView())
+      else
+        local sections = A:GetStaticPlanSections(A.selectedProfessionID)
+        body:SetText(sections[activeMode] or sections.route)
+      end
+    end
     scanButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     scanButton:SetSize(115, 23)
     scanButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -16, 13)
@@ -77,9 +135,7 @@ function A:ShowWindow(showPlan)
       if A.bankOpen then A:ScanBank() end
       A:ScanProfessions()
       A:ScanKnownRecipes()
-      CancelPlan()
-      activeMode = "overview"
-      body:SetText(A:BuildOverview())
+      UpdateView()
     end)
     cycleButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     cycleButton:SetSize(115, 23)
@@ -186,15 +242,7 @@ function A:ShowWindow(showPlan)
       scanButton:SetText(A:T("SCAN"))
       cycleButton:SetText(A:T("SWITCH"))
       languageButton:SetText(A:T("LANGUAGE") .. ": " .. (A.languageNames[A.db.language or "auto"] or "Auto"))
-      if frame:IsShown() then
-        if activeMode == "plan" then
-          -- planReady updates the text without launching a calculation.
-          -- Stock and profession updates mark cache stale in PlanCache.lua.
-          StartPlan()
-        else
-          body:SetText(A:BuildOverview())
-        end
-      end
+      if frame:IsShown() then UpdateView() end
     end)
   end
   if title then
@@ -203,12 +251,10 @@ function A:ShowWindow(showPlan)
     cycleButton:SetText(self:T("SWITCH"))
     languageButton:SetText(self:T("LANGUAGE") .. ": " .. (self.languageNames[self.db.language or "auto"] or "Auto"))
   end
-  if showPlan and self.GetPrimaryPlanText then
-    StartPlan()
+  if showPlan then
+    SelectTab("route")
   else
-    CancelPlan()
-    activeMode = "overview"
-    body:SetText(self:BuildOverview())
+    SelectTab("inventory")
   end
   frame:Show()
 end
