@@ -161,6 +161,9 @@ local function RenderInteractiveRoute(sections)
       lines[#lines + 1] = "|cff55ff88" .. A:T("CURRENT_RECIPE") .. "|r"
     end
     lines[#lines + 1] = title
+    if stage.sourceNotice then
+      lines[#lines + 1] = "|cffffaa55" .. stage.sourceNotice .. "|r"
+    end
     for _, entry in ipairs(stage.preparations or {}) do
       local name = (GetSpellInfo and GetSpellInfo(entry.id)) or tostring(entry.id)
       lines[#lines + 1] = A:T("CRAFT_PREREQUISITE_GAIN", name, entry.count, entry.expected)
