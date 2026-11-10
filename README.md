@@ -4,7 +4,7 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development build — v0.4.1.** The addon has not been comprehensively tested in-game. Recipe metadata, trainer locations, price estimates, and UI behavior may be incomplete or inaccurate. See [SPEC.md](SPEC.md) for the agreed feature requirements.
+> **Development build — v0.4.2.** The addon has not been comprehensively tested in-game. Recipe metadata, trainer locations, price estimates, and UI behavior may be incomplete or inaccurate. See [SPEC.md](SPEC.md) for the agreed feature requirements.
 
 ## Requirements
 
@@ -78,11 +78,19 @@ Integration is based on the [OneForAll Forever 6.2.2 minimap collector](https://
 - **Same-realm character tracking:** Save observed professions, bag inventory, and bank inventory snapshots. Offline inventory is not live.
 - **Item tooltips:** Display recorded quantities by character and detected profession uses.
 - **Conservative material classification:** Build a reverse reagent index from LibProfessionDB. Uncertain items are **not** labeled safe to sell.
-- **Crafting route estimates:** Suggest trainer-sourced recipes based on current skill, known materials, and estimated additional spend using an approximate greedy algorithm.
+- **Crafting route estimates:** Prefer **orange and yellow** trainer recipes for reliable skill-ups, with green only as an explicitly labeled fallback. Color thresholds use numeric Forever skill data extracted from OneForAll (when available); cost estimates still use known inventory and Auctionator prices. Routes use a greedy heuristic, not a global optimum.
 - **Auctionator price lookup:** Use `Auctionator.API.v1.GetAuctionPriceByItemID` when prices are available.
 - **Shopping estimates:** Show missing material quantities after subtracting recorded same-realm stock and subtotal the materials with known prices.
 - **Gathering guides:** Text-only 1–300 guidance for Herbalism, Mining, and Skinning. Zones and skill thresholds are reference data and still need Forever-specific verification.
 - **Trainer hints:** Show recipe learning status when detectable, required skill, trainer names when present in the data, and known location hints. Some locations are from Classic/Vanilla and may not be accurate for Forever. A fallback profession trainer is **not a guarantee** that the NPC teaches a particular recipe.
+
+## Recipe colors and OneForAll data
+
+Forever Profession Helper now includes `OneForAllSkillColors.lua`, a compact snapshot of 2,156 **numeric** recipe learning requirements and skill-color thresholds (yellow, green, gray), derived from [OneForAll Forever](https://github.com/smoergi/OneForAll_Forever/tree/main/OneForAll/Data/Professions). It does **not** require OneForAll to be installed and does not modify OneForAll. Recipe ingredients, trainer status and stock calculations still come from LibProfessionDB and this addon's own records.
+
+The planner prefers orange/yellow recipes even if a green recipe looks cheaper. Green recipes only appear when no eligible orange/yellow trainer recipe with usable data is available at that skill level. Gray recipes are excluded. It displays the selected color and warns when green is used.
+
+The data may become outdated if OneForAll or WoW Forever changes its recipes. This is an extracted snapshot, **not a runtime connection** to OneForAll. See [DATA_SOURCES.md](DATA_SOURCES.md) for attribution and extraction notes.
 
 ## Known limitations
 
