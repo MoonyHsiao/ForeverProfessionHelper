@@ -40,6 +40,18 @@ for skillID, name in pairs(skills) do
       assert(not entry[7],
         string.format("%s unexpected non-trainer step at %d", name, level))
     end
+    -- Run the actual fixed-step advancement used by PlanCache.lua from
+    -- every initial rank. No missing/zero-progress step may stop the guide.
+    local progress, operations = level, 0
+    while progress < 300 and operations < 350 do
+      local selected = A:GetStaticLevelingStep(skillID, progress)
+      assert(selected and selected[3] > 0,
+        string.format("%s route stops at %.2f (start %d)", name, progress, level))
+      progress = math.min(300, progress + selected[3])
+      operations = operations + 1
+    end
+    assert(progress >= 300,
+      string.format("%s cannot reach 300 from %d", name, level))
     checked = checked + 1
   end
 end
