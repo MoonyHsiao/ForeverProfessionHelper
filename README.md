@@ -4,13 +4,13 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development branch — v1.1.4-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+> **Development branch — v1.1.5-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
 
 ## Branches and versioning
 
 - **`main`**: the v1.0.0 baseline and future stable releases.
 - **`develop`**: ongoing feature development. Changes should be reviewed before merging into `main`.
-- Development builds increment **only the patch component**: `v1.1.4-dev` → `v1.1.5-dev` → `v1.1.6-dev`. Do not increase the minor version for ordinary `develop` commits.
+- Development builds increment **only the patch component**: `v1.1.5-dev` → `v1.1.6-dev` → `v1.1.7-dev`. Do not increase the minor version for ordinary `develop` commits.
 - When a set of changes is promoted to the stable `main` branch, bump the stable release to the next minor version (for example, `v1.2.0`) and drop the `-dev` suffix. This repository uses `main`, not `master`.
 - After that release, continue new development builds from the released series by increasing only the patch version (for example, `v1.2.1-dev`).
 - Keep version numbers synchronized in `ForeverProfessionHelper.toc` and `Core.lua`.
@@ -85,13 +85,13 @@ Integration is based on the [OneForAll Forever 6.2.2 minimap collector](https://
 
 - **Same-realm inventory:** Track bags, bank and professions across recorded characters; offline stock is a snapshot.
 - **Material classification:** Identify materials used by learned professions and show relevant quantities in item tooltips.
-- **Leveling guide:** Prefer orange/yellow trainer recipes, with green only as fallback. Rank routes by approximate material units per expected skill-up, counting prerequisite skill gains.
+- **Leveling guide:** Display a predetermined recipe route by current skill level, prioritizing orange/yellow recipes, with green as fallback. Offline-generated records include approximate material requirements and intermediary skill gains.
 - **Intermediate recipes:** Reuse earlier crafted products and simulate up to three levels of same-profession prerequisites.
 - **Estimated materials:** Show gross raw-material requirements, **without deducting current inventory**.
 - **Gathering guides:** Text reference routes for Herbalism, Mining and Skinning.
 - **Trainer hints:** Show learned status when detectable, required skill and trainer/location references.
 
-**No Auctionator integration or cost optimization is used for the leveling planner.**
+**No Auctionator integration, background calculation or runtime cost optimization is used for the leveling guide.**
 
 ## Reuse of crafted intermediate items (develop)
 
@@ -99,17 +99,19 @@ The planner now simulates **crafted output items** as well as reagent consumptio
 
 Example: **Fine Leather Belt (item 4246) → Dark Leather Belt**. Belts crafted earlier in the selected route are counted as available materials for the later step. The recommendation output also lists how many intermediate items were reused.
 
-The planner recursively crafts available same-profession intermediate reagents, using up to three dependency levels. Intermediate crafts are shown before the stage that consumes them. The recipe output mapping comes from OneForAll Forever for recipes whose LibProfessionDB crafted-item ID is absent. The planner still uses local greedy decisions; it is not yet a globally optimized route. It assumes one crafted item per operation unless recipe yield metadata is explicitly provided, and it only credits outputs with a valid crafted item ID.
+The offline route generator expands selected same-profession intermediate reagents where supported by the source dataset. Intermediate crafts are shown before the stage that consumes them. The recipe output mapping comes from OneForAll Forever for recipes whose LibProfessionDB crafted-item ID is absent. The planner still uses local greedy decisions; it is not yet a globally optimized route. It assumes one crafted item per operation unless recipe yield metadata is explicitly provided, and it only credits outputs with a valid crafted item ID.
 
-Prerequisite crafts now contribute **estimated skill gains** before the parent recipe is simulated. The planner reevaluates later recipes using the updated projected skill, and lists expected skill gains next to prerequisite crafts. Yellow/green gains remain probability-based estimates, not guaranteed results. The route heuristic compares expected skill gains and raw material quantities, not market prices. Cross-profession crafting is deliberately excluded: prerequisites must belong to the selected profession. An isolated Lua regression script is available at `tests/planner_prerequisites.lua` (not loaded by WoW). See [PLANNER_TEST_CASES.md](PLANNER_TEST_CASES.md) for the expected belt example. Changes in `develop` are not included in stable `main` until merged.
+Prerequisite crafts now contribute **estimated skill gains** before the parent recipe is simulated. Static route entries already account for estimated prerequisite skill gains and display those estimates next to prerequisite crafts. Yellow/green gains remain probability-based estimates, not guaranteed results. The offline generator compares expected skill gains and raw-material counts, not market prices. Cross-profession crafting is deliberately excluded: prerequisites must belong to the selected profession. An isolated Lua regression script is available at `tests/planner_prerequisites.lua` (not loaded by WoW). See [PLANNER_TEST_CASES.md](PLANNER_TEST_CASES.md) for the expected belt example. Changes in `develop` are not included in stable `main` until merged.
 
-## Prepared leveling routes (develop)
+## Offline precomputed leveling routes (develop)
 
-After login, a background worker prepares a route for the current profession level using static recipe and skill-color data. Clicking **Leveling Guide** only displays the cached result.
+The addon ships a `StaticRoutes.lua` lookup table generated **outside the game** from OneForAll Forever's recipe skill thresholds and reagent data. For each skill level, it contains a reference recipe, approximate craft count, anticipated intermediate crafts and raw-material quantities.
 
-Routes depend on profession skill, trainer-available recipes, skill-up probabilities and the benefits of making intermediate materials. They **do not depend on character inventory, auction prices, or vendor prices**. Only profession-level or recipe-data changes invalidate the prepared route. Inventory remains a separate feature.
+**No runtime route optimizer or background worker is loaded.** Clicking **Leveling Guide** simply reads the current profession skill and displays the corresponding static entries; there is no coroutine, `OnUpdate` planner, inventory-driven reranking or price lookup. A language change only re-renders labels.
 
-The materials list estimates overall raw-material needs and deliberately does not subtract existing inventory.
+The guide is an approximation, and its static selection may not always match trainer availability reported by LibProfessionDB. Not all profession skill levels are covered by the source snapshot; uncovered ranges are shown as incomplete instead of triggering an expensive fallback. Intermediate craft skill gains are estimated using offline skill-color thresholds, not observed success rates.
+
+The raw-material list is an estimate for the displayed static route. It does not subtract live inventory, and no auction or vendor values are used.
 
 ## Recipe colors and OneForAll data
 
