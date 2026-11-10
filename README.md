@@ -4,7 +4,13 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development build — v0.4.2.** The addon has not been comprehensively tested in-game. Recipe metadata, trainer locations, price estimates, and UI behavior may be incomplete or inaccurate. See [SPEC.md](SPEC.md) for the agreed feature requirements.
+> **Baseline release — v1.0.0.** The current feature baseline has been accepted for release. Profession recipes, trainer locations, cost estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+
+## Branches and versioning
+
+- **`main`**: the v1.0.0 baseline and future stable releases.
+- **`develop`**: ongoing feature development. Changes should be reviewed before merging into `main`.
+- Version numbers are kept in `ForeverProfessionHelper.toc` and `Core.lua`.
 
 ## Requirements
 
