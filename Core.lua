@@ -53,7 +53,7 @@ function A:Initialize()
   self:ScanProfessions()
   self:LoadRecipeDatabase()
   self:ScanBags()
-  self:Print("已載入。輸入 /fph 開啟視窗。")
+  self:Print(self:T("LOAD_MESSAGE"))
 end
 
 for _, event in ipairs({
@@ -89,22 +89,31 @@ SlashCmdList.FOREVERPROFESSIONHELPER = function(message)
     local skillID = tonumber(message:match("^plan%s+(%d+)$"))
     if skillID then A.selectedProfessionID = skillID end
     A:ShowWindow(true)
+  elseif message == "lang" or message:match("^lang%s+") then
+    local code = message:match("^lang%s+(%S+)$")
+    if code and (code == "auto" or code == "enUS" or code == "zhTW" or code == "zhCN" or code == "enus" or code == "zhtw" or code == "zhcn") then
+      local normalized = ({enus="enUS",zhtw="zhTW",zhcn="zhCN"})[code] or code
+      A:SetLanguage(normalized)
+    else
+      A:CycleLanguage()
+    end
+    A:Print(A:T("LANGUAGE") .. ": " .. (A.languageNames[A.db.language or "auto"] or "Auto"))
   elseif message == "db" then
     local ready, status = A:LoadRecipeDatabase()
-    A:Print("配方資料庫：" .. (ready and "已載入 " or "無法載入：") .. tostring(status))
-    A:Print("已解析配方 " .. tostring(A.recipeCount or 0) .. " 筆；材料關聯 " .. tostring(A.reagentCount or 0) .. " 筆")
+    A:Print(A:T("CHAT_DB", tostring(status)))
+    A:Print(A:T("CHAT_PARSED", A.recipeCount or 0, A.reagentCount or 0))
     local ids = {}
     for id in pairs(A.recipeCoverage or {}) do ids[#ids + 1] = tostring(id) end
     table.sort(ids)
-    A:Print("已覆蓋專業 ID：" .. (#ids > 0 and table.concat(ids, ", ") or "無"))
+    A:Print(A:T("CHAT_COVERAGE", #ids > 0 and table.concat(ids, ", ") or A:T("CHAT_NONE")))
   elseif message == "scan" then
     A:ScanBags()
     if A.bankOpen then A:ScanBank() end
     A:ScanProfessions()
     A:ScanKnownRecipes()
-    A:Print("已重新掃描當前可讀資料。")
+    A:Print(A:T("RESCANNED"))
   elseif message == "help" then
-    A:Print("/fph 開啟視窗；/fph plan [專業ID] 升級推薦；/fph db 配方狀態；/fph scan 重新掃描。")
+    A:Print(A:T("CHAT_HELP"))
   else
     A:ShowWindow()
   end
