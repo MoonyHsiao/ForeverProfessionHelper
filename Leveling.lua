@@ -52,27 +52,16 @@ local function Holdings(self)
   end
   return stock
 end
-local function Score(recipe, stock, level)
+local function Score(recipe, stock, producedStock, byItem, level)
   local chance, color = SkillChance(recipe, level)
   if not chance or chance == 0 then return nil end
   if recipe.hidden or recipe.requiredSpec or not recipe.trainer then return nil end
   local colors = A.GetOneForAllSkillThresholds and A:GetOneForAllSkillThresholds(recipe.skillID, recipe.id)
   local required = colors and colors[1] or recipe.requiredSkill
   if (required or 9999) > level then return nil end
-  local total, unknown, missing = 0, 0, {}
-  for id, qty in pairs(recipe.reagents) do
-    local deficit = math.max(0, qty - (stock[id] or 0))
-    if deficit > 0 then
-      missing[id] = deficit
-      local price, source = Copper(id)
-      if not price then unknown = unknown + 1
-      elseif source == "vendor-sell-value" then
-        -- Vendor sell value is NOT a known purchase price.
-        unknown = unknown + 1
-      else total = total + price * deficit end
-    end
-  end
-  return { cost = total / chance, unknown = unknown, chance = chance, missing = missing,
+  local estimate = A:SimulateCraftInputs(recipe, 1, stock, producedStock, byItem, level)
+  return { cost = estimate.cost / chance, unknown = estimate.unknown,
+    chance = chance, missing = estimate.shopping,
     color = color, tier = color == "green" and 1 or 0 }
 end
 function A:PlanProfession(skillID, target)
@@ -85,6 +74,7 @@ function A:PlanProfession(skillID, target)
   if #recipes == 0 then return nil, self:T("PLAN_NO_RECIPES") end
   local stock = Holdings(self)
   local producedStock, reusedOutputs = {}, {}
+  local craftingIndex = self:BuildCraftingIndex(recipes)
   local lines, shopping, steps, unresolved = {}, {}, 0, false
   local usedGreen = false
   local diagnostic = { available = #recipes, trainer = 0, learnable = 0, difficultyUnknown = 0 }
@@ -101,7 +91,7 @@ function A:PlanProfession(skillID, target)
           end
         end
       end
-      local score = Score(recipe, stock, current)
+      local score = Score(recipe, stock, producedStock, craftingIndex, current)
       if score then
         -- Unknown prices are a fallback, not a reason to hide every recipe.
         if not bestScore or score.tier < bestScore.tier
@@ -116,41 +106,32 @@ function A:PlanProfession(skillID, target)
     if bestScore.color == "green" then usedGreen = true end
     local times = math.max(1, math.ceil(1 / bestScore.chance))
     local start = current
-    for _ = 1, times do
-      for id, qty in pairs(best.reagents) do
-        local onHand = math.min(stock[id] or 0, qty)
-        local fromCrafting = math.min(producedStock[id] or 0, onHand)
-        if fromCrafting > 0 then
-          producedStock[id] = producedStock[id] - fromCrafting
-          reusedOutputs[id] = (reusedOutputs[id] or 0) + fromCrafting
-        end
-        stock[id] = (stock[id] or 0) - onHand
-        local need = qty - onHand
-        if need > 0 then shopping[id] = (shopping[id] or 0) + need end
-      end
-      -- Crafted items must return to the simulated stock before the next
-      -- recommendation. Example: Fine Leather Belt -> Dark Leather Belt.
-      -- Only credit a confirmed item ID; assume one output unless the
-      -- recipe database supplies a reliable explicit yield.
-      local productID = tonumber(best.craftedItemId)
-      if productID and productID > 0 then
-        local yield = tonumber(best.craftedQuantity) or 1
-        yield = math.max(1, math.floor(yield))
-        stock[productID] = (stock[productID] or 0) + yield
-        producedStock[productID] = (producedStock[productID] or 0) + yield
-      end
+    local simulated = self:SimulateCraftInputs(best, times, stock, producedStock, craftingIndex, current)
+    stock, producedStock = simulated.stock, simulated.produced
+    for id, qty in pairs(simulated.shopping) do
+      shopping[id] = (shopping[id] or 0) + qty
     end
+    for id, qty in pairs(simulated.reused) do
+      reusedOutputs[id] = (reusedOutputs[id] or 0) + qty
+    end
+
     current = current + 1 -- expected skill gain; recipe counts are estimates
     steps = steps + 1
     local last = lines[#lines]
     if last and last.recipe.id == best.id and last.color == bestScore.color then
       last.to = current
       last.crafts = last.crafts + times
+      for recipeID, prep in pairs(simulated.preparations) do
+        local entry = last.preparations[recipeID] or { recipe = prep.recipe, crafts = 0 }
+        entry.crafts = entry.crafts + prep.crafts
+        last.preparations[recipeID] = entry
+      end
     else
       lines[#lines + 1] = {
         from = start, to = current, crafts = times, recipe = best,
         estimatedCostPerSkill = bestScore.cost,
         color = bestScore.color,
+        preparations = simulated.preparations,
       }
     end
   end
@@ -179,6 +160,14 @@ function A:PlanSummary(skillID, target)
     self:T("PLAN_DISCLAIMER"),
   }
   for i, stage in ipairs(result.lines) do
+    local preps = {}
+    for _, preparation in pairs(stage.preparations or {}) do
+      preps[#preps + 1] = preparation
+    end
+    table.sort(preps, function(a, b) return a.recipe.id < b.recipe.id end)
+    for _, prep in ipairs(preps) do
+      textLines[#textLines + 1] = self:T("CRAFT_PREREQUISITE", prep.recipe.name, prep.crafts)
+    end
     local r = stage.recipe
     textLines[#textLines + 1] = string.format("%d～%d：%s ×%d [%s]",
       stage.from, stage.to, r.name, stage.crafts, self:T("COLOR_" .. string.upper(stage.color or "unknown")))
