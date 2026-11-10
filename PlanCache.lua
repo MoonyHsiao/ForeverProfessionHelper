@@ -69,7 +69,7 @@ function A:GetStaticPlanSections(skillID)
   local index = RecipeIndex(selected.id)
   local current = tonumber(selected.rank) or 1
   local projected = current
-  local rows, materials = {}, {}
+  local rows, materials, fallbackNotices = {}, {}, {}
   local hasGreen, prepGain = false, 0
   local operations = 0
   while projected < 300 and operations < 350 do
@@ -77,6 +77,12 @@ function A:GetStaticPlanSections(skillID)
     if not step then break end
     local spell, crafts, gain, color = step[1], step[2], step[3], step[4]
     if not gain or gain <= 0 then break end
+    local source = step[7]
+    local sourceNotice
+    if source then
+      sourceNotice = self:T("NONTRAINER_RECIPE", source[1], source[2])
+      fallbackNotices[spell] = sourceNotice
+    end
     -- The fixed guide deliberately never re-ranks choices based on bags,
     -- banks, prices, or user interactions.
     local recipe = index[spell]
@@ -100,7 +106,8 @@ function A:GetStaticPlanSections(skillID)
     local previous = rows[#rows]
     -- Aggregate adjacent levels using the same recipe and skill color.
     -- Keep prerequisite order stable and sum their craft counts/skill gains.
-    if previous and previous.spell == spell and previous.color == colorName then
+    if previous and previous.spell == spell and previous.color == colorName
+      and previous.sourceNotice == sourceNotice then
       previous.to = finish
       previous.crafts = previous.crafts + crafts
       for _, prep in ipairs(prepEntries) do
@@ -117,7 +124,8 @@ function A:GetStaticPlanSections(skillID)
     else
       local stage = {from = projected, to = finish, name = name,
         crafts = crafts, color = colorName, preparations = {},
-        prepByID = {}, recipe = recipe, spell = spell}
+        prepByID = {}, recipe = recipe, spell = spell,
+        sourceNotice = sourceNotice}
       for _, prep in ipairs(prepEntries) do
         local combined = {id = prep.id, count = prep.count, expected = prep.expected}
         stage.preparations[#stage.preparations + 1] = combined
@@ -151,6 +159,9 @@ function A:GetStaticPlanSections(skillID)
     lines[#lines + 1] = string.format("%d-%d: %s x%d [%s]",
       math.floor(stage.from), math.floor(stage.to), stage.name,
       stage.crafts, self:T("COLOR_" .. stage.color))
+    if stage.sourceNotice then
+      lines[#lines + 1] = "  " .. stage.sourceNotice
+    end
   end
   if prepGain > 0 then lines[#lines + 1] = self:T("TOTAL_PREP_GAIN", prepGain) end
   if hasGreen then lines[#lines + 1] = self:T("GREEN_FALLBACK") end
@@ -162,6 +173,13 @@ function A:GetStaticPlanSections(skillID)
     "",
     self:T("SHOPPING"),
   }
+  local sourceIDs = {}
+  for id in pairs(fallbackNotices) do sourceIDs[#sourceIDs + 1] = id end
+  table.sort(sourceIDs)
+  for _, spellID in ipairs(sourceIDs) do
+    materialLines[#materialLines + 1] = fallbackNotices[spellID]
+  end
+  if #sourceIDs > 0 then materialLines[#materialLines + 1] = "" end
   local ids = {}
   for id in pairs(materials) do ids[#ids + 1] = id end
   table.sort(ids)
