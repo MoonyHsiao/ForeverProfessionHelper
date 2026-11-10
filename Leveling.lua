@@ -71,7 +71,7 @@ local function Score(recipe, stock, producedStock, byItem, level)
     chance = chance, expectedGain = gain, missing = estimate.shopping,
     color = estimate.mainColor or color, tier = (estimate.mainColor or color) == "green" and 1 or 0 }
 end
-function A:PlanProfession(skillID, target)
+function A:PlanProfession(skillID, target, progressYield)
   if not self.recipeDatabaseReady then return nil, self:T("PLAN_DB") end
   local skill = self:Character().professions[tonumber(skillID)]
   if not skill then return nil, self:T("PLAN_NOT_LEARNED_PROF") end
@@ -99,6 +99,7 @@ function A:PlanProfession(skillID, target)
         end
       end
       local score = Score(recipe, stock, producedStock, craftingIndex, current)
+      if progressYield then progressYield(1, current, target) end
       if score then
         -- Unknown prices are a fallback, not a reason to hide every recipe.
         if not bestScore or score.tier < bestScore.tier
@@ -175,8 +176,8 @@ function A:PlanProfession(skillID, target)
     end)(),
   }
 end
-function A:PlanSummary(skillID, target)
-  local result, err = self:PlanProfession(skillID, target)
+function A:PlanSummary(skillID, target, progressYield)
+  local result, err = self:PlanProfession(skillID, target, progressYield)
   if not result then return err end
   local textLines = {
     self:T("PLAN_HEADER", tostring(skillID), result.from, math.floor(result.to), result.target),
@@ -284,7 +285,7 @@ function A:GetEligibleProfessions()
   table.sort(valid, function(a, b) return a.id < b.id end)
   return valid
 end
-function A:GetPrimaryPlanText(skillID)
+function A:GetPrimaryPlanText(skillID, progressYield)
   if not self.initialized then return self:T("CHAR_NOT_READY") end
   local valid = self:GetEligibleProfessions()
   if #valid == 0 then return self:T("NO_ELIGIBLE") end
@@ -299,7 +300,7 @@ function A:GetPrimaryPlanText(skillID)
     return guide or self:T("GUIDE_UNAVAILABLE")
   end
   local plan = selection.name .. " " .. selection.rank .. "/300\n\n" ..
-    self:PlanSummary(selection.id, 300)
+    self:PlanSummary(selection.id, 300, progressYield)
   if guide then plan = plan .. "\n\n" .. guide end
   return plan
 end
