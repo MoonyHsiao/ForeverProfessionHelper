@@ -126,7 +126,7 @@ function A:PlanProfession(skillID, target)
     current = current + 1 -- expected skill gain; recipe counts are estimates
     steps = steps + 1
     local last = lines[#lines]
-    if last and last.recipe.id == best.id then
+    if last and last.recipe.id == best.id and last.color == bestScore.color then
       last.to = current
       last.crafts = last.crafts + times
     else
