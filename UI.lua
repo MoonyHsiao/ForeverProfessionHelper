@@ -60,7 +60,7 @@ function A:BuildInventoryView()
       lines[#lines + 1] = (ch.name or charID) .. " (" .. tostring(#ids) .. ")"
       for i, id in ipairs(ids) do
         local bagCount, bankCount = (ch.bags or {})[id] or 0, (ch.bank or {})[id] or 0
-        local itemName = (GetItemInfo and GetItemInfo(id)) or self:T("ITEM_FALLBACK", id)
+        local itemName = self:DisplayItemName(id)
         lines[#lines + 1] = string.format("  %s: %s", itemName,
           self:T("INVENTORY_LINE", bagCount, bankCount))
         if i >= 100 then
@@ -103,7 +103,7 @@ local function ShowRecipeTooltip(button, stage)
     for id in pairs(recipe.reagents) do ids[#ids + 1] = id end
     table.sort(ids)
     for _, id in ipairs(ids) do
-      local name = (GetItemInfo and GetItemInfo(id)) or A:T("ITEM_FALLBACK", id)
+      local name = A:DisplayItemName(id)
       GameTooltip:AddLine(string.format("  %s x%d", name, recipe.reagents[id]), 1, 1, 1)
     end
   end
