@@ -4,13 +4,13 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development branch — v1.1.5-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+> **Development branch — v1.1.6-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
 
 ## Branches and versioning
 
 - **`main`**: the v1.0.0 baseline and future stable releases.
 - **`develop`**: ongoing feature development. Changes should be reviewed before merging into `main`.
-- Development builds increment **only the patch component**: `v1.1.5-dev` → `v1.1.6-dev` → `v1.1.7-dev`. Do not increase the minor version for ordinary `develop` commits.
+- Development builds increment **only the patch component**: `v1.1.6-dev` → `v1.1.7-dev` → `v1.1.8-dev`. Do not increase the minor version for ordinary `develop` commits.
 - When a set of changes is promoted to the stable `main` branch, bump the stable release to the next minor version (for example, `v1.2.0`) and drop the `-dev` suffix. This repository uses `main`, not `master`.
 - After that release, continue new development builds from the released series by increasing only the patch version (for example, `v1.2.1-dev`).
 - Keep version numbers synchronized in `ForeverProfessionHelper.toc` and `Core.lua`.
@@ -75,7 +75,7 @@ Integration is based on the [OneForAll Forever 6.2.2 minimap collector](https://
 | --- | --- |
 | `/fph` | Open character and inventory overview. |
 | `/fph plan` | Open the leveling planner for the default recorded profession. |
-| `/fph plan 164` | Open the planner for a specific profession ID (164 = Blacksmithing). The UI also provides a profession-switch button. |
+| `/fph plan 164` | Open the planner for a specific profession ID (164 = Blacksmithing). The UI also provides a profession dropdown listing available professions and current ranks. |
 | `/fph db` | Show library status, parsed recipe count, reagent links, and profession coverage. |
 | `/fph scan` | Rescan currently accessible bags, bank, and professions. |
 | `/fph lang [auto\|enUS\|zhTW\|zhCN]` | Change the addon language; omitting an argument cycles the choices. |
@@ -124,7 +124,7 @@ The data may become outdated if OneForAll or WoW Forever changes its recipes. Th
 ## Known limitations
 
 - The leveling algorithm is a **greedy heuristic, not a globally optimal route**. Quantities and expected skill gains remain estimates.
-- The UI can cycle between professions but does not yet provide a full multi-tab interface. Gathering guidance is static and does not display map routes or live gathering nodes.
+- The UI offers a dropdown for profession selection but does not yet provide a full multi-tab interface. Gathering guidance is static and does not display map routes or live gathering nodes.
 - Some trainer sources and skill requirements are borrowed from Vanilla and have not been verified against Forever. Recipes with unverified sources may be excluded.
 - Learned-recipe detection can be inconclusive when the profession window is closed. Specialization restrictions may be incomplete.
 - Some intermediate materials may not be producible with available trainer recipes; cross-profession crafting is excluded.
