@@ -9,5 +9,6 @@ Inventory.lua
 Professions.lua
 RecipeDB.lua
 Leveling.lua
+Gathering.lua
 Items.lua
 UI.lua
