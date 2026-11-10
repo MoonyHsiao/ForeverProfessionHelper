@@ -84,6 +84,7 @@ function A:PlanProfession(skillID, target)
   local recipes = self:GetRecipesForSkill(skillID)
   if #recipes == 0 then return nil, self:T("PLAN_NO_RECIPES") end
   local stock = Holdings(self)
+  local producedStock, reusedOutputs = {}, {}
   local lines, shopping, steps, unresolved = {}, {}, 0, false
   local usedGreen = false
   local diagnostic = { available = #recipes, trainer = 0, learnable = 0, difficultyUnknown = 0 }
@@ -118,6 +119,11 @@ function A:PlanProfession(skillID, target)
     for _ = 1, times do
       for id, qty in pairs(best.reagents) do
         local onHand = math.min(stock[id] or 0, qty)
+        local fromCrafting = math.min(producedStock[id] or 0, onHand)
+        if fromCrafting > 0 then
+          producedStock[id] = producedStock[id] - fromCrafting
+          reusedOutputs[id] = (reusedOutputs[id] or 0) + fromCrafting
+        end
         stock[id] = (stock[id] or 0) - onHand
         local need = qty - onHand
         if need > 0 then shopping[id] = (shopping[id] or 0) + need end
@@ -131,6 +137,7 @@ function A:PlanProfession(skillID, target)
         local yield = tonumber(best.craftedQuantity) or 1
         yield = math.max(1, math.floor(yield))
         stock[productID] = (stock[productID] or 0) + yield
+        producedStock[productID] = (producedStock[productID] or 0) + yield
       end
     end
     current = current + 1 -- expected skill gain; recipe counts are estimates
@@ -161,6 +168,7 @@ function A:PlanProfession(skillID, target)
     approximate = true, incomplete = current < target, missingPrices = unresolved,
     diagnostics = diagnostic,
     usedGreen = usedGreen,
+    reusedOutputs = reusedOutputs,
   }
 end
 function A:PlanSummary(skillID, target)
@@ -207,6 +215,16 @@ function A:PlanSummary(skillID, target)
     textLines[#textLines + 1] = self:T("PLAN_INCOMPLETE")
     local d = result.diagnostics or {}
     textLines[#textLines + 1] = string.format(self:T("PLAN_DIAGNOSTIC"), d.available or 0, d.trainer or 0, d.learnable or 0, d.difficultyUnknown or 0)
+  end
+  if next(result.reusedOutputs or {}) then
+    textLines[#textLines + 1] = self:T("REUSED_OUTPUTS")
+    local reusedIDs = {}
+    for id in pairs(result.reusedOutputs) do reusedIDs[#reusedIDs + 1] = id end
+    table.sort(reusedIDs)
+    for _, id in ipairs(reusedIDs) do
+      local name = (GetItemInfo and GetItemInfo(id)) or self:T("ITEM_FALLBACK", id)
+      textLines[#textLines + 1] = string.format("  %s x%d", name, result.reusedOutputs[id])
+    end
   end
   textLines[#textLines + 1] = self:T("SHOPPING")
   local ids = {}
