@@ -199,6 +199,7 @@ function A:GetStaticPlanSections(skillID)
     currentSkill = current,
     projectedSkill = projected,
     professionID = selected.id,
+    hasNonTrainerFallback = next(fallbackNotices) ~= nil,
   }
 end
 
