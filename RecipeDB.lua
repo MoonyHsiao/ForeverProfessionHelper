@@ -45,11 +45,16 @@ local function Decode(skillID, spellID, info, db)
     end
   end
   local difficulty = info.difficulty or {}
+  local oneForAllItem, oneForAllCount
+  if A.GetOneForAllCraftOutput then
+    oneForAllItem, oneForAllCount = A:GetOneForAllCraftOutput(spellID)
+  end
   local recipe = {
     id = spellID, skillID = skillID, name = info.name or tostring(spellID),
     reagents = reagents, requiredSkill = tonumber(info.requiredSkill) or tonumber(difficulty[1]) or 1,
     difficulty = difficulty,
-    craftedItemId = info.craftedItemId or info.craftedItemID,
+    craftedItemId = tonumber(info.craftedItemId or info.craftedItemID) or oneForAllItem,
+    craftedQuantity = tonumber(info.craftedQuantity or info.numCrafted) or oneForAllCount or 1,
     sourceKinds = sourceKinds,
     trainer = sourceKinds.trainer == true,
     trainerNames = {},
