@@ -1,6 +1,6 @@
 local _, ns = ...
 local A = ns.A
-local frame, body, activeMode, title, scanButton, planButton, cycleButton, languageButton = nil, nil, "overview"
+local frame, body, activeMode, title, scanButton, planButton, cycleButton, languageButton, languageMenu = nil, nil, "overview"
 local function sortedKeys(map)
   local keys = {}
   for key in pairs(map or {}) do keys[#keys + 1] = key end
@@ -21,7 +21,7 @@ function A:BuildOverview()
     local hasProfession = false
     for _, skillID in ipairs(sortedKeys(ch.professions)) do
       local skill = ch.professions[skillID]
-      lines[#lines + 1] = "  " .. skill.name .. " " .. (skill.rank or 0) .. "/" .. (skill.max or 0)
+      lines[#lines + 1] = "  " .. self:ProfessionName(skillID, skill.name) .. " " .. (skill.rank or 0) .. "/" .. (skill.max or 0)
       hasProfession = true
     end
     if not hasProfession then lines[#lines + 1] = self:T("NO_PROFESSION") end
@@ -101,7 +101,40 @@ function A:ShowWindow(showPlan)
     languageButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     languageButton:SetSize(118, 23)
     languageButton:SetPoint("RIGHT", cycleButton, "LEFT", -6, 0)
-    languageButton:SetScript("OnClick", function() A:CycleLanguage() end)
+    -- A self-contained dropdown, independent of client-specific UIDropDownMenu templates.
+    languageMenu = CreateFrame("Frame", nil, frame)
+    languageMenu:SetSize(158, 112)
+    languageMenu:SetFrameStrata("DIALOG")
+    languageMenu:SetFrameLevel(frame:GetFrameLevel() + 30)
+    languageMenu:SetPoint("BOTTOMLEFT", languageButton, "TOPLEFT", 0, 3)
+    local bg = languageMenu:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0.07, 0.07, 0.08, 0.97)
+    local border = languageMenu:CreateTexture(nil, "BORDER")
+    border:SetAllPoints()
+    border:SetColorTexture(0.55, 0.42, 0.18, 0.35)
+    local inset = languageMenu:CreateTexture(nil, "ARTWORK")
+    inset:SetPoint("TOPLEFT", 1, -1)
+    inset:SetPoint("BOTTOMRIGHT", -1, 1)
+    inset:SetColorTexture(0.07, 0.07, 0.08, 0.97)
+    for i, code in ipairs(A.languageCodes) do
+      local option = CreateFrame("Button", nil, languageMenu)
+      option:SetSize(154, 26)
+      option:SetPoint("TOPLEFT", 2, -(i - 1) * 27 - 2)
+      local label = option:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+      label:SetPoint("LEFT", 9, 0)
+      label:SetText(A.languageNames[code])
+      option:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+      option:SetScript("OnClick", function()
+        languageMenu:Hide()
+        A:SetLanguage(code)
+      end)
+    end
+    languageMenu:Hide()
+    languageButton:SetScript("OnClick", function()
+      if languageMenu:IsShown() then languageMenu:Hide() else languageMenu:Show() end
+    end)
+    frame:HookScript("OnHide", function() languageMenu:Hide() end)
     self:RegisterView("overview", function()
       title:SetText(A:T("TITLE") .. " " .. A.version)
       scanButton:SetText(A:T("SCAN"))
