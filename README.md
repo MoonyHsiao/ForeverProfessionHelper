@@ -4,7 +4,7 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development branch — v1.1.0-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, cost estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+> **Development branch — v1.1.1-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, cost estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
 
 ## Branches and versioning
 
@@ -96,9 +96,9 @@ The planner now simulates **crafted output items** as well as reagent consumptio
 
 Example: **Fine Leather Belt (item 4246) → Dark Leather Belt**. Belts crafted earlier in the selected route are counted as available materials for the later step. The recommendation output also lists how many intermediate items were reused.
 
-This change links the steps **already selected by the planner**, but is not yet a full dependency-aware cheapest-route optimizer. It assumes one crafted item per operation unless recipe yield metadata is explicitly provided, and it only credits outputs with a valid crafted item ID.
+The planner now compares direct acquisition against recursively crafting intermediate reagents, using up to three dependency levels. Intermediate crafts are shown before the stage that consumes them. The recipe output mapping comes from OneForAll Forever for recipes whose LibProfessionDB crafted-item ID is absent. The planner still uses local greedy decisions; it is not yet a globally optimized route. It assumes one crafted item per operation unless recipe yield metadata is explicitly provided, and it only credits outputs with a valid crafted item ID.
 
-See [PLANNER_TEST_CASES.md](PLANNER_TEST_CASES.md) for the expected belt example. Changes in `develop` are not included in stable `main` until merged.
+Prerequisite crafts are not credited as skill-ups; the actual skill curve may therefore differ. When prices are unknown, comparisons are provisional. See [PLANNER_TEST_CASES.md](PLANNER_TEST_CASES.md) for the expected belt example. Changes in `develop` are not included in stable `main` until merged.
 
 ## Recipe colors and OneForAll data
 
