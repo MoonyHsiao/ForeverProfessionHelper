@@ -162,3 +162,25 @@ function A:PlanSummary(skillID, target)
   end
   return table.concat(textLines, "\n")
 end
+
+-- Default to the first learned crafting profession. Gathering professions currently
+-- have no route data in this module and are reported separately.
+function A:GetPrimaryPlanText()
+  if not self.initialized then return "角色資料尚未就緒" end
+  local skills = self:Character().professions or {}
+  local valid = {}
+  for key, value in pairs(skills) do
+    local id = tonumber(key)
+    if id and #self:GetRecipesForSkill(id) > 0 then
+      valid[#valid + 1] = { id = id, rank = value.rank or 0, name = value.name or tostring(id) }
+    end
+  end
+  table.sort(valid, function(a, b) return a.id < b.id end)
+  if #valid == 0 then
+    return "沒有可規劃的製造專業。採集專業文字指南仍待實作。"
+  end
+  local selection = valid[1]
+  return selection.name .. " " .. selection.rank .. "/300\n\n" ..
+    self:PlanSummary(selection.id, 300) ..
+    "\n\n目前先展示第一個製造專業；後續將加入專業切換。"
+end
