@@ -36,8 +36,14 @@ function A:LoadRecipeDatabase()
   index, covered, records, ingredients = {}, {}, 0, 0
   local lib = LibStub and LibStub("LibProfessionDB-1.0", true)
   local status
-  if not lib or not lib.IsReady or not lib:IsReady() then
-    status = "請先安裝並啟用 LibProfessionDB"
+  if type(LibStub) ~= "function" and type(LibStub) ~= "table" then
+    status = "未偵測到 LibStub：請確認 Ace3 及資料庫依賴已啟用"
+  elseif not lib then
+    status = "找不到 LibProfessionDB-1.0 註冊；請確認 ProfessionDB 插件已載入"
+  elseif type(lib.IsReady) ~= "function" then
+    status = "找到資料庫，但缺少 IsReady API（版本不相容）"
+  elseif not lib:IsReady() then
+    status = "找到 LibProfessionDB，但尚未載入配方資料；請確認安裝 Forever 對應版本"
   elseif lib.GetGameVersion and lib:GetGameVersion() ~= "Forever" then
     status = "資料庫並非《永恆》版本"
   elseif not lib.GetRecipes or not lib.GetProfessions then
