@@ -51,8 +51,8 @@ function A:BuildCraftingIndex(recipes)
   return byItem
 end
 
--- Returns an isolated trial state, including purchases, intermediate crafts,
--- newly crafted inventory and intermediate output reuse.
+-- Returns an isolated simulation of raw-material needs, intermediate crafts,
+-- simulated crafting outputs and their reuse. No external stock or price inputs.
 function A:SimulateCraftInputs(recipe, times, initialStock, initialProduced, byItem, skillLevel)
   local state = {
     stock = CopyMap(initialStock), produced = CopyMap(initialProduced),
