@@ -132,7 +132,7 @@ function A:GetRecipesForSkill(skillID)
 end
 
 function A:RecipeUsers(itemID)
-  local users, found, complete, hasProfession = {}, false, self.recipeDatabaseReady, false
+  local users, found, complete, hasProfession = {}, false, self.recipeDatabaseReady and recipesParsed >= 2400, false
   if not self.initialized then return "unknown", users end
   local uses = index[itemID] or {}
   for _, ch in pairs(self:Store().characters) do
