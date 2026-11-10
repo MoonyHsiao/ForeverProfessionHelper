@@ -10,12 +10,16 @@ local function CopyMap(source)
   return out
 end
 local function CopyState(s)
+  local preparations = {}
+  for id, row in pairs(s.preparations or {}) do
+    preparations[id] = { recipe = row.recipe, crafts = row.crafts }
+  end
   return {
     stock = CopyMap(s.stock),
     produced = CopyMap(s.produced),
     shopping = CopyMap(s.shopping),
     reused = CopyMap(s.reused),
-    preparations = CopyMap(s.preparations),
+    preparations = preparations,
     cost = s.cost,
     unknown = s.unknown,
   }
