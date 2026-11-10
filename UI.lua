@@ -1,6 +1,56 @@
 local _, ns = ...
 local A = ns.A
 local frame, body, activeMode, title, scanButton, planButton, cycleButton, languageButton, languageMenu = nil, nil, "overview"
+-- The 1-300 planner is expensive. Run its coroutine across UI frames instead
+-- of blocking WoW's main thread in a single click callback.
+local planJob, planGeneration = nil, 0
+local function CancelPlan()
+  planGeneration = planGeneration + 1
+  planJob = nil
+  if frame then frame:SetScript("OnUpdate", nil) end
+end
+local function StartPlan()
+  if not frame or not body then return end
+  CancelPlan()
+  activeMode = "plan"
+  local token = planGeneration
+  local job = { evaluations = 0, current = 0, target = 300, elapsed = 0 }
+  job.thread = coroutine.create(function()
+    return A:GetPrimaryPlanText(A.selectedProfessionID, function(count, current, target)
+      job.evaluations = job.evaluations + (count or 1)
+      job.current = math.floor(current or 0)
+      job.target = target or 300
+      if job.evaluations % 4 == 0 then coroutine.yield() end
+    end)
+  end)
+  planJob = job
+  body:SetText(A:T("PLAN_CALCULATING", job.current, job.target))
+  frame:SetScript("OnUpdate", function(self, elapsed)
+    if planJob ~= job or planGeneration ~= token then
+      self:SetScript("OnUpdate", nil)
+      return
+    end
+    -- One coroutine slice per rendered frame; the planner yields every four
+    -- recipe evaluations to preserve UI responsiveness.
+    local ok, outcome = coroutine.resume(job.thread)
+    if not ok then
+      body:SetText(A:T("PLAN_ERROR", tostring(outcome)))
+      CancelPlan()
+      return
+    end
+    if coroutine.status(job.thread) == "dead" then
+      body:SetText(tostring(outcome or ""))
+      planJob = nil
+      self:SetScript("OnUpdate", nil)
+      return
+    end
+    job.elapsed = job.elapsed + (elapsed or 0)
+    if job.elapsed > 0.3 then
+      job.elapsed = 0
+      body:SetText(A:T("PLAN_CALCULATING", job.current, job.target))
+    end
+  end)
+end
 local function sortedKeys(map)
   local keys = {}
   for key in pairs(map or {}) do keys[#keys + 1] = key end
@@ -69,6 +119,7 @@ function A:ShowWindow(showPlan)
       if A.bankOpen then A:ScanBank() end
       A:ScanProfessions()
       A:ScanKnownRecipes()
+      CancelPlan()
       activeMode = "overview"
       body:SetText(A:BuildOverview())
     end)
@@ -77,8 +128,7 @@ function A:ShowWindow(showPlan)
     planButton:SetPoint("RIGHT", scanButton, "LEFT", -6, 0)
     planButton:SetText(A:T("PLAN"))
     planButton:SetScript("OnClick", function()
-      activeMode = "plan"
-      body:SetText(A:GetPrimaryPlanText(A.selectedProfessionID))
+      StartPlan()
     end)
     cycleButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     cycleButton:SetSize(115, 23)
@@ -95,8 +145,7 @@ function A:ShowWindow(showPlan)
         end
       end
       A.selectedProfessionID = list[nextIndex].id
-      activeMode = "plan"
-      body:SetText(A:GetPrimaryPlanText(A.selectedProfessionID))
+      StartPlan()
     end)
     languageButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     languageButton:SetSize(118, 23)
@@ -134,15 +183,35 @@ function A:ShowWindow(showPlan)
     languageButton:SetScript("OnClick", function()
       if languageMenu:IsShown() then languageMenu:Hide() else languageMenu:Show() end
     end)
-    frame:HookScript("OnHide", function() languageMenu:Hide() end)
-    self:RegisterView("overview", function()
+    frame:HookScript("OnHide", function() languageMenu:Hide(); CancelPlan() end)
+    self:RegisterView("overview", function(reason)
       title:SetText(A:T("TITLE") .. " " .. A.version)
       scanButton:SetText(A:T("SCAN"))
       planButton:SetText(A:T("PLAN"))
       cycleButton:SetText(A:T("SWITCH"))
       languageButton:SetText(A:T("LANGUAGE") .. ": " .. (A.languageNames[A.db.language or "auto"] or "Auto"))
       if frame:IsShown() then
-        body:SetText(activeMode == "plan" and A:GetPrimaryPlanText(A.selectedProfessionID) or A:BuildOverview())
+        if activeMode == "plan" then
+          -- Inventory and skill changes invalidate a running plan. Debounce
+          -- recalculation so BAG_UPDATE events cannot restart on every item.
+          if reason == "language" then
+            StartPlan()
+          elseif reason == "bags" or reason == "bank" or reason == "professions" or reason == "recipes" or reason == "recipeDB" then
+            if not A.planDebouncePending then
+              A.planDebouncePending = true
+              if C_Timer and C_Timer.After then
+                C_Timer.After(0.8, function()
+                  A.planDebouncePending = false
+                  if frame and frame:IsShown() and activeMode == "plan" then StartPlan() end
+                end)
+              else
+                A.planDebouncePending = false
+              end
+            end
+          end
+        else
+          body:SetText(A:BuildOverview())
+        end
       end
     end)
   end
@@ -154,9 +223,9 @@ function A:ShowWindow(showPlan)
     languageButton:SetText(self:T("LANGUAGE") .. ": " .. (self.languageNames[self.db.language or "auto"] or "Auto"))
   end
   if showPlan and self.GetPrimaryPlanText then
-    activeMode = "plan"
-    body:SetText(self:GetPrimaryPlanText(self.selectedProfessionID))
+    StartPlan()
   else
+    CancelPlan()
     activeMode = "overview"
     body:SetText(self:BuildOverview())
   end
