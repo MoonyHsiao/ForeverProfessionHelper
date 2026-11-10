@@ -4,7 +4,7 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Baseline release — v1.0.0.** The current feature baseline has been accepted for release. Profession recipes, trainer locations, cost estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+> **Development branch — v1.1.0-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, cost estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
 
 ## Branches and versioning
 
@@ -89,6 +89,16 @@ Integration is based on the [OneForAll Forever 6.2.2 minimap collector](https://
 - **Shopping estimates:** Show missing material quantities after subtracting recorded same-realm stock and subtotal the materials with known prices.
 - **Gathering guides:** Text-only 1–300 guidance for Herbalism, Mining, and Skinning. Zones and skill thresholds are reference data and still need Forever-specific verification.
 - **Trainer hints:** Show recipe learning status when detectable, required skill, trainer names when present in the data, and known location hints. Some locations are from Classic/Vanilla and may not be accurate for Forever. A fallback profession trainer is **not a guarantee** that the NPC teaches a particular recipe.
+
+## Reuse of crafted intermediate items (develop)
+
+The planner now simulates **crafted output items** as well as reagent consumption. When an earlier stage creates an item required by a later recipe, the later stage uses the simulated stock before adding any missing amount to the shopping list.
+
+Example: **Fine Leather Belt (item 4246) → Dark Leather Belt**. Belts crafted earlier in the selected route are counted as available materials for the later step. The recommendation output also lists how many intermediate items were reused.
+
+This change links the steps **already selected by the planner**, but is not yet a full dependency-aware cheapest-route optimizer. It assumes one crafted item per operation unless recipe yield metadata is explicitly provided, and it only credits outputs with a valid crafted item ID.
+
+See [PLANNER_TEST_CASES.md](PLANNER_TEST_CASES.md) for the expected belt example. Changes in `develop` are not included in stable `main` until merged.
 
 ## Recipe colors and OneForAll data
 
