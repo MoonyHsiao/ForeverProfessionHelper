@@ -4,15 +4,15 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Stable release — v1.2.0.** This release includes the profession dropdown, static leveling routes and prerequisite-crafting estimates. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+> **Stable release — v1.3.0.** This release includes the profession dropdown, static leveling routes and prerequisite-crafting estimates. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
 
 ## Branches and versioning
 
-- **`main`**: stable releases (current: v1.2.0).
+- **`main`**: stable releases (current: v1.3.0).
 - **`develop`**: ongoing feature development. Changes should be reviewed before merging into `main`.
-- Development builds increment **only the patch component**, for example `v1.2.1-dev` → `v1.2.2-dev`. Do not increase the minor version for ordinary `develop` commits.
+- Development builds increment **only the patch component**, for example `v1.3.1-dev` → `v1.3.2-dev`. Do not increase the minor version for ordinary `develop` commits.
 - When a set of changes is promoted to the stable `main` branch, bump the stable release to the next minor version (for example, `v1.2.0`) and drop the `-dev` suffix. This repository uses `main`, not `master`.
-- After that release, continue new development builds from the released series by increasing only the patch version (for example, `v1.2.1-dev`).
+- After that release, continue new development builds from the released series by increasing only the patch version (for example, `v1.2.4-dev`).
 - Keep version numbers synchronized in `ForeverProfessionHelper.toc` and `Core.lua`.
 
 ## Requirements
@@ -43,6 +43,37 @@ To inspect library registration directly:
 ```
 
 A table indicates that the library object is registered; `nil` indicates that it is unavailable under this name.
+
+## Prerequisite recipe names (develop)
+
+Crafting-spell IDs in the route (for example leatherworking spell 3763, Fine Leather Belt, or 3817, Cured Medium Hide) now use localized LibProfessionDB recipe names first, game GetSpellInfo next, and an offline English OneForAll Forever fallback if neither can name an unlearned spell. This changes only labels, not quantities or route decisions.
+
+## 1–300 route coverage (develop)
+
+All eight crafting professions now have a statically defined recommendation for **every integer skill level 1–299**, reaching 300 without invoking the runtime optimizer. The audit covers **2,392 entries** and checks progression from every starting skill.
+
+The default guide still favors trainer recipes. The current OneForAll Forever data has **45 uncovered skill levels** where trainer-only progression is not supported. Instead of hiding the gap or incorrectly identifying an external recipe as a trainer recipe, the addon uses exactly four **explicitly labeled non-trainer recipe exceptions**:
+
+| Profession | Skill interval | Exception recipe | How to learn |
+| --- | --- | --- | --- |
+| First Aid | 210–239 | Mageweave Bandage | Manual item 16113, vendors Deneb Walker / Balai Lok'Wein |
+| Blacksmithing | 295–299 | Imperial Plate Leggings | Plans item 12715, associated quest |
+| Leatherworking | 265–269 | Frostsaber Boots | Pattern item 15740, vendor Qia in Winterspring |
+| Cooking | 280–284 | Poached Sunscale Salmon | Recipe item 13946, vendor Gikkix in Tanaris |
+
+The UI calls out these exceptions in both the route and material tabs. The data is an offline, probability-based estimate, **not a guarantee that every recipe is already learned or obtainable on a particular faction/character**. Source availability and some trainer classification still require Forever 1.60.1 in-game verification.
+
+Offline coverage regression: `lua tests/route_coverage.lua`.
+
+## Material name resolution (develop)
+
+All material quantities continue to come from the fixed static leveling route. Item labels first use the WoW client's localized `GetItemInfo` data. When the item is not cached yet, an English offline fallback from OneForAll Forever is displayed instead of a bare numeric item ID; the addon requests missing item data and refreshes visible material, inventory and tooltip text when `GET_ITEM_INFO_RECEIVED` reports availability. Items missing from both sources still display an item-ID fallback. No background route calculation is added.
+
+## Training cap alerts and interactive recipes (develop)
+
+The leveling route shows an alert when the current profession is within five points of its known 75/150/225 training cap, or has already reached that cap. The alert uses the **actual character skill maximum**, not an inferred trainer location. The advice applies to gathering guides too.
+
+The route tab displays interactive recipe rows with the **first recommended stage highlighted**. Hovering a stage shows a game-native crafted-item or spell tooltip when available, plus the recipe reagent list from LibProfessionDB. If the game API cannot supply a native tooltip, the addon shows a recipe-name fallback. Materials and inventory tabs remain text views. The addon still uses only precomputed static route data, not a background solver.
 
 ## Three-tab interface (develop)
 
@@ -120,7 +151,7 @@ The addon ships a `StaticRoutes.lua` lookup table generated **outside the game**
 
 **No runtime route optimizer or background worker is loaded.** Clicking **Leveling Guide** simply reads the current profession skill and displays the corresponding static entries; there is no coroutine, `OnUpdate` planner, inventory-driven reranking or price lookup. A language change only re-renders labels.
 
-The guide is an approximation, and its static selection may not always match trainer availability reported by LibProfessionDB. Not all profession skill levels are covered by the source snapshot; uncovered ranges are shown as incomplete instead of triggering an expensive fallback. Intermediate craft skill gains are estimated using offline skill-color thresholds, not observed success rates.
+The guide is an approximation, and its static selection may not always match trainer availability reported by LibProfessionDB. Any future unresolved gap is shown as incomplete instead of triggering an expensive runtime calculation. Four source-annotated non-trainer exceptions currently cover the 45 trainer-only gaps. Intermediate craft skill gains are estimated using offline skill-color thresholds, not observed success rates.
 
 The raw-material list is an estimate for the displayed static route. It does not subtract live inventory, and no auction or vendor values are used.
 

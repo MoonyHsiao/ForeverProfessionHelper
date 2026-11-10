@@ -16,6 +16,23 @@ local function RecipeIndex(skillID)
   return bySpell
 end
 
+-- Prefer localized profession database names; GetSpellInfo may return nil
+-- for unlearned crafting spells on Forever. The offline map stays readable.
+function A:GetRecipeDisplayName(skillID, spellID)
+  local recipe = RecipeIndex(skillID)[tonumber(spellID)]
+  local name = recipe and recipe.name
+  if name and name ~= "" and name ~= tostring(spellID) then return name end
+  if GetSpellInfo then
+    name = GetSpellInfo(spellID)
+    if name and name ~= "" then return name end
+  end
+  if self.GetOfflineRecipeName then
+    name = self:GetOfflineRecipeName(spellID)
+    if name then return name end
+  end
+  return tostring(spellID)
+end
+
 function A:GetEligibleProfessions()
   local valid = {}
   for id, skill in pairs(self:Character().professions or {}) do
@@ -46,8 +63,21 @@ function A:GetStaticPlanSections(skillID)
   end
   self.selectedProfessionID = selected.id
   local guide = self.GetGatheringGuide and self:GetGatheringGuide(selected.id, selected.rank)
+  local capNotice
+  local skillState = self:Character().professions[selected.id]
+  local rank = tonumber(selected.rank) or 0
+  local cap = skillState and tonumber(skillState.max) or 0
+  if cap == 75 or cap == 150 or cap == 225 then
+    if rank >= cap then
+      capNotice = self:T("SKILL_CAP_REACHED", cap)
+    elseif rank >= cap - 5 then
+      capNotice = self:T("SKILL_CAP_NEAR", cap - rank, cap)
+    end
+  end
   if selected.id == 182 or selected.id == 393 then
-    return {route = guide or self:T("GUIDE_UNAVAILABLE"), materials = self:T("GUIDE_UNAVAILABLE")}
+    local route = guide or self:T("GUIDE_UNAVAILABLE")
+    if capNotice then route = capNotice .. "\n\n" .. route end
+    return {route = route, materials = self:T("GUIDE_UNAVAILABLE")}
   end
   if not self.recipeDatabaseReady then
     return {route = self:T("PLAN_DB"), materials = self:T("PLAN_DB")}
@@ -56,7 +86,7 @@ function A:GetStaticPlanSections(skillID)
   local index = RecipeIndex(selected.id)
   local current = tonumber(selected.rank) or 1
   local projected = current
-  local rows, materials = {}, {}
+  local rows, materials, fallbackNotices = {}, {}, {}
   local hasGreen, prepGain = false, 0
   local operations = 0
   while projected < 300 and operations < 350 do
@@ -64,11 +94,16 @@ function A:GetStaticPlanSections(skillID)
     if not step then break end
     local spell, crafts, gain, color = step[1], step[2], step[3], step[4]
     if not gain or gain <= 0 then break end
+    local source = step[7]
+    local sourceNotice
+    if source then
+      sourceNotice = self:T("NONTRAINER_RECIPE", source[1], source[2])
+      fallbackNotices[spell] = sourceNotice
+    end
     -- The fixed guide deliberately never re-ranks choices based on bags,
     -- banks, prices, or user interactions.
     local recipe = index[spell]
-    local name = (recipe and recipe.name) or
-      (GetSpellInfo and GetSpellInfo(spell)) or tostring(spell)
+    local name = self:GetRecipeDisplayName(selected.id, spell)
     local colorName = ({"ORANGE", "YELLOW", "GREEN"})[color] or "UNKNOWN"
     if color == 3 then hasGreen = true end
     local prepEntries = {}
@@ -87,7 +122,8 @@ function A:GetStaticPlanSections(skillID)
     local previous = rows[#rows]
     -- Aggregate adjacent levels using the same recipe and skill color.
     -- Keep prerequisite order stable and sum their craft counts/skill gains.
-    if previous and previous.spell == spell and previous.color == colorName then
+    if previous and previous.spell == spell and previous.color == colorName
+      and previous.sourceNotice == sourceNotice then
       previous.to = finish
       previous.crafts = previous.crafts + crafts
       for _, prep in ipairs(prepEntries) do
@@ -104,7 +140,8 @@ function A:GetStaticPlanSections(skillID)
     else
       local stage = {from = projected, to = finish, name = name,
         crafts = crafts, color = colorName, preparations = {},
-        prepByID = {}, recipe = recipe, spell = spell}
+        prepByID = {}, recipe = recipe, spell = spell,
+        sourceNotice = sourceNotice}
       for _, prep in ipairs(prepEntries) do
         local combined = {id = prep.id, count = prep.count, expected = prep.expected}
         stage.preparations[#stage.preparations + 1] = combined
@@ -122,6 +159,7 @@ function A:GetStaticPlanSections(skillID)
     self:T("PLAN_HEADER", tostring(selected.id), current, math.floor(projected), 300),
     self:T("PLAN_DISCLAIMER"),
   }
+  if capNotice then table.insert(lines, 2, capNotice) end
   for i, stage in ipairs(rows) do
     if i > 35 then
       lines[#lines + 1] = self:T("MORE_STAGES")
@@ -129,14 +167,16 @@ function A:GetStaticPlanSections(skillID)
     end
     for _, entry in ipairs(stage.preparations) do
       local prep = index[entry.id]
-      local prepName = (prep and prep.name) or
-        (GetSpellInfo and GetSpellInfo(entry.id)) or tostring(entry.id)
+      local prepName = self:GetRecipeDisplayName(selected.id, entry.id)
       lines[#lines + 1] = self:T("CRAFT_PREREQUISITE_GAIN",
         prepName, entry.count, entry.expected)
     end
     lines[#lines + 1] = string.format("%d-%d: %s x%d [%s]",
       math.floor(stage.from), math.floor(stage.to), stage.name,
       stage.crafts, self:T("COLOR_" .. stage.color))
+    if stage.sourceNotice then
+      lines[#lines + 1] = "  " .. stage.sourceNotice
+    end
   end
   if prepGain > 0 then lines[#lines + 1] = self:T("TOTAL_PREP_GAIN", prepGain) end
   if hasGreen then lines[#lines + 1] = self:T("GREEN_FALLBACK") end
@@ -148,6 +188,13 @@ function A:GetStaticPlanSections(skillID)
     "",
     self:T("SHOPPING"),
   }
+  local sourceIDs = {}
+  for id in pairs(fallbackNotices) do sourceIDs[#sourceIDs + 1] = id end
+  table.sort(sourceIDs)
+  for _, spellID in ipairs(sourceIDs) do
+    materialLines[#materialLines + 1] = fallbackNotices[spellID]
+  end
+  if #sourceIDs > 0 then materialLines[#materialLines + 1] = "" end
   local ids = {}
   for id in pairs(materials) do ids[#ids + 1] = id end
   table.sort(ids)
@@ -155,12 +202,19 @@ function A:GetStaticPlanSections(skillID)
     materialLines[#materialLines + 1] = self:T("MATERIALS_EMPTY")
   end
   for _, id in ipairs(ids) do
-    local itemName = (GetItemInfo and GetItemInfo(id)) or self:T("ITEM_FALLBACK", id)
+    local itemName = self:DisplayItemName(id)
     materialLines[#materialLines + 1] = string.format("  %s x%d", itemName, materials[id])
   end
   return {
     route = table.concat(lines, "\n"),
     materials = table.concat(materialLines, "\n"),
+    stages = rows,
+    skillCapNotice = capNotice,
+    professionName = selected.name,
+    currentSkill = current,
+    projectedSkill = projected,
+    professionID = selected.id,
+    hasNonTrainerFallback = next(fallbackNotices) ~= nil,
   }
 end
 

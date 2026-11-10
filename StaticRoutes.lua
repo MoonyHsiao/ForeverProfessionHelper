@@ -2370,5 +2370,10 @@ local routes = {
 }
 function A:GetStaticLevelingStep(skillID, level)
   local list = routes[tonumber(skillID)]
-  return list and list[math.floor(tonumber(level) or 0)]
+  local skill = math.floor(tonumber(level) or 0)
+  local trained = list and list[skill]
+  -- Preserve trainer-only choices wherever available. Source-annotated,
+  -- non-trainer fallback recipes are used ONLY for explicit missing levels.
+  if trained then return trained end
+  return self.GetRouteFallback and self:GetRouteFallback(skillID, skill)
 end
