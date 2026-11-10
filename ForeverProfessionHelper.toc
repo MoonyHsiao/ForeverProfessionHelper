@@ -14,6 +14,7 @@ OneForAllSkillColors.lua
 TrainerLocations.lua
 CraftingDependencies.lua
 Leveling.lua
+PlanCache.lua
 Gathering.lua
 Items.lua
 UI.lua
