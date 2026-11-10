@@ -4,7 +4,7 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development build — v0.4.0.** The addon has not been comprehensively tested in-game. Recipe metadata, trainer locations, price estimates, and UI behavior may be incomplete or inaccurate. See [SPEC.md](SPEC.md) for the agreed feature requirements.
+> **Development build — v0.4.1.** The addon has not been comprehensively tested in-game. Recipe metadata, trainer locations, price estimates, and UI behavior may be incomplete or inaccurate. See [SPEC.md](SPEC.md) for the agreed feature requirements.
 
 ## Requirements
 
@@ -40,10 +40,10 @@ A table indicates that the library object is registered; `nil` indicates that it
 
 The addon defaults to **Auto**, which follows the language of the WoW client via `GetLocale()`.
 
-- In the addon window, click **Language** to cycle through **Auto → Traditional Chinese → Simplified Chinese → English**. The override is saved account-wide in SavedVariables and takes effect immediately.
+- In the addon window, click **Language** to open a dropdown menu and directly select **Auto**, **Traditional Chinese**, **Simplified Chinese**, or **English**. The override is saved account-wide in SavedVariables and takes effect immediately.
 - You can also type `/fph lang enUS`, `/fph lang zhTW`, `/fph lang zhCN`, or `/fph lang auto`.
 - Client languages other than `zhTW`, `zhCN`, and `enUS` currently use English as the default.
-- Core UI, material/tooltips, leveling-plan labels, and guide instructions are localized. English gathering route names are included; Simplified Chinese gathering place and resource names may still use Traditional Chinese source data, and trainer names/recipe names originate from the game or LibProfessionDB and may not match the selected language.
+- Core UI, profession names (by profession ID, including offline snapshots), material/tooltips, leveling-plan labels, and guide instructions are localized. English gathering route names are included; Simplified Chinese gathering place and resource names may still use Traditional Chinese source data, and trainer names, recipe names and item names originate from the game or LibProfessionDB and may not match the selected language.
 - Switching the addon language does not change the WoW client's language.
 
 ## OneForAll minimap button integration
