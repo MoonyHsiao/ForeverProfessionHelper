@@ -41,6 +41,9 @@ local function SkillChance(recipe, level)
   if level < grey then return 0.25, "green" end
   return nil
 end
+function A:EstimateSkillChance(recipe, level)
+  return SkillChance(recipe, level)
+end
 local function Holdings(self)
   local stock = {}
   for _, ch in pairs(self:Store().characters) do
@@ -60,9 +63,13 @@ local function Score(recipe, stock, producedStock, byItem, level)
   local required = colors and colors[1] or recipe.requiredSkill
   if (required or 9999) > level then return nil end
   local estimate = A:SimulateCraftInputs(recipe, 1, stock, producedStock, byItem, level)
-  return { cost = estimate.cost / chance, unknown = estimate.unknown,
-    chance = chance, missing = estimate.shopping,
-    color = color, tier = color == "green" and 1 or 0 }
+  local gain = estimate.skill - level
+  -- Do not recommend crafting a gray parent recipe just because its
+  -- prerequisites happen to award skill points.
+  if gain <= 0 or (estimate.gainedFromMain or 0) <= 0 then return nil end
+  return { cost = estimate.cost / gain, unknown = estimate.unknown,
+    chance = chance, expectedGain = gain, missing = estimate.shopping,
+    color = estimate.mainColor or color, tier = (estimate.mainColor or color) == "green" and 1 or 0 }
 end
 function A:PlanProfession(skillID, target)
   if not self.recipeDatabaseReady then return nil, self:T("PLAN_DB") end
@@ -104,7 +111,7 @@ function A:PlanProfession(skillID, target)
     if not best then break end
     if bestScore.unknown > 0 then unresolved = true end
     if bestScore.color == "green" then usedGreen = true end
-    local times = math.max(1, math.ceil(1 / bestScore.chance))
+    local times = math.max(1, math.min(20, math.ceil(1 / bestScore.expectedGain)))
     local start = current
     local simulated = self:SimulateCraftInputs(best, times, stock, producedStock, craftingIndex, current)
     stock, producedStock = simulated.stock, simulated.produced
@@ -115,15 +122,20 @@ function A:PlanProfession(skillID, target)
       reusedOutputs[id] = (reusedOutputs[id] or 0) + qty
     end
 
-    current = current + 1 -- expected skill gain; recipe counts are estimates
+    local gain = math.max(0, simulated.skill - current)
+    if gain <= 0 then break end
+    current = math.min(target, simulated.skill)
     steps = steps + 1
     local last = lines[#lines]
     if last and last.recipe.id == best.id and last.color == bestScore.color then
       last.to = current
       last.crafts = last.crafts + times
+      last.prepGain = (last.prepGain or 0) + simulated.gainedFromPrep
+      last.mainGain = (last.mainGain or 0) + simulated.gainedFromMain
       for recipeID, prep in pairs(simulated.preparations) do
         local entry = last.preparations[recipeID] or { recipe = prep.recipe, crafts = 0 }
         entry.crafts = entry.crafts + prep.crafts
+        entry.expectedGain = (entry.expectedGain or 0) + (prep.expectedGain or 0)
         last.preparations[recipeID] = entry
       end
     else
@@ -132,6 +144,7 @@ function A:PlanProfession(skillID, target)
         estimatedCostPerSkill = bestScore.cost,
         color = bestScore.color,
         preparations = simulated.preparations,
+        prepGain = simulated.gainedFromPrep, mainGain = simulated.gainedFromMain,
       }
     end
   end
@@ -150,13 +163,18 @@ function A:PlanProfession(skillID, target)
     diagnostics = diagnostic,
     usedGreen = usedGreen,
     reusedOutputs = reusedOutputs,
+    expectedSkillFromPreparations = (function()
+      local total = 0
+      for _, stage in ipairs(lines) do total = total + (stage.prepGain or 0) end
+      return total
+    end)(),
   }
 end
 function A:PlanSummary(skillID, target)
   local result, err = self:PlanProfession(skillID, target)
   if not result then return err end
   local textLines = {
-    self:T("PLAN_HEADER", tostring(skillID), result.from, result.to, result.target),
+    self:T("PLAN_HEADER", tostring(skillID), result.from, math.floor(result.to), result.target),
     self:T("PLAN_DISCLAIMER"),
   }
   for i, stage in ipairs(result.lines) do
@@ -166,11 +184,11 @@ function A:PlanSummary(skillID, target)
     end
     table.sort(preps, function(a, b) return a.recipe.id < b.recipe.id end)
     for _, prep in ipairs(preps) do
-      textLines[#textLines + 1] = self:T("CRAFT_PREREQUISITE", prep.recipe.name, prep.crafts)
+      textLines[#textLines + 1] = self:T("CRAFT_PREREQUISITE_GAIN", prep.recipe.name, prep.crafts, prep.expectedGain or 0)
     end
     local r = stage.recipe
     textLines[#textLines + 1] = string.format("%d～%d：%s ×%d [%s]",
-      stage.from, stage.to, r.name, stage.crafts, self:T("COLOR_" .. string.upper(stage.color or "unknown")))
+      math.floor(stage.from), math.floor(stage.to), r.name, stage.crafts, self:T("COLOR_" .. string.upper(stage.color or "unknown")))
     local learned = self:RecipeLearned(r.id)
     if learned == true then
       textLines[#textLines + 1] = self:T("LEARNED")
@@ -198,6 +216,9 @@ function A:PlanSummary(skillID, target)
       textLines[#textLines + 1] = self:T("MORE_STAGES")
       break
     end
+  end
+  if (result.expectedSkillFromPreparations or 0) > 0 then
+    textLines[#textLines + 1] = self:T("TOTAL_PREP_GAIN", result.expectedSkillFromPreparations)
   end
   if result.usedGreen then textLines[#textLines + 1] = self:T("GREEN_FALLBACK") end
   if result.incomplete then
