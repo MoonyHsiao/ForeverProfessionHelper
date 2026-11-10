@@ -34,12 +34,24 @@ end
 
 function A:LoadRecipeDatabase()
   index, covered, records, ingredients = {}, {}, 0, 0
+  -- ProfessionDB is the addon folder name; LibProfessionDB-1.0 is its library key.
+  -- Never register a third-party library ourselves, as that would mask a missing addon.
+  local addonLoaded = false
+  if C_AddOns and C_AddOns.IsAddOnLoaded then
+    addonLoaded = C_AddOns.IsAddOnLoaded("ProfessionDB")
+  elseif IsAddOnLoaded then
+    addonLoaded = IsAddOnLoaded("ProfessionDB")
+  end
+  if not addonLoaded then
+    local load = (C_AddOns and C_AddOns.LoadAddOn) or LoadAddOn
+    if load then pcall(load, "ProfessionDB") end
+  end
   local lib = LibStub and LibStub("LibProfessionDB-1.0", true)
   local status
   if type(LibStub) ~= "function" and type(LibStub) ~= "table" then
     status = "未偵測到 LibStub：請確認 Ace3 及資料庫依賴已啟用"
   elseif not lib then
-    status = "找不到 LibProfessionDB-1.0 註冊；請確認 ProfessionDB 插件已載入"
+    status = "找不到 LibProfessionDB-1.0：確認 AddOns 中 ProfessionDB 已啟用、版本為 Forever；插件目錄應為 ProfessionDB"
   elseif type(lib.IsReady) ~= "function" then
     status = "找到資料庫，但缺少 IsReady API（版本不相容）"
   elseif not lib:IsReady() then
