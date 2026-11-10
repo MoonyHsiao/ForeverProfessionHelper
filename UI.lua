@@ -32,7 +32,7 @@ function A:BuildOverview()
   lines[#lines + 1] = "待完成：完整配方、訓練師、最低成本路線、Auctionator、購物清單、採集指南。"
   return table.concat(lines, "\n")
 end
-function A:ShowWindow()
+function A:ShowWindow(showPlan)
   if not self.initialized then return end
   if not frame then
     frame = CreateFrame("Frame", "ForeverProfessionHelperWindow", UIParent, "BasicFrameTemplateWithInset")
@@ -45,7 +45,7 @@ function A:ShowWindow()
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     title:SetPoint("TOP", frame, "TOP", 0, -6)
-    title:SetText("永恆專業助手 0.2.0")
+    title:SetText("永恆專業助手 0.3.0")
     local scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 18, -40)
     scroll:SetPoint("BOTTOMRIGHT", -34, 48)
@@ -68,10 +68,21 @@ function A:ShowWindow()
       A:ScanKnownRecipes()
       body:SetText(A:BuildOverview())
     end)
+    local planButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    planButton:SetSize(115, 23)
+    planButton:SetPoint("RIGHT", button, "LEFT", -6, 0)
+    planButton:SetText("升級推薦")
+    planButton:SetScript("OnClick", function()
+      body:SetText(A:GetPrimaryPlanText())
+    end)
     self:RegisterView("overview", function()
       if frame:IsShown() then body:SetText(A:BuildOverview()) end
     end)
   end
-  body:SetText(self:BuildOverview())
+  if showPlan and self.GetPrimaryPlanText then
+    body:SetText(self:GetPrimaryPlanText())
+  else
+    body:SetText(self:BuildOverview())
+  end
   frame:Show()
 end
