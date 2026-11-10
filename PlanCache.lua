@@ -132,8 +132,8 @@ function A:GetStaticPlanSections(skillID)
     materialLines[#materialLines + 1] = string.format("  %s x%d", itemName, materials[id])
   end
   return {
-    route = table.concat(lines, "\\n"),
-    materials = table.concat(materialLines, "\\n"),
+    route = table.concat(lines, "\n"),
+    materials = table.concat(materialLines, "\n"),
   }
 end
 
