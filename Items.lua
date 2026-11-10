@@ -3,8 +3,14 @@ local A = ns.A
 -- Unknown items must never be declared safe to sell without full recipe data.
 function A:Classify(itemID)
   if not itemID then return "unknown", {} end
-  local users = self:ObservedItemUsers(itemID)
-  if #users > 0 then return "needed", users end
+  local status, users = self:RecipeUsers(itemID)
+  if status == "needed" then return status, users end
+  local observed = self:ObservedItemUsers(itemID)
+  if #observed > 0 then return "needed", observed end
+  if status == "not_needed" and GetItemInfoInstant then
+    local _, _, _, _, _, classID = GetItemInfoInstant(itemID)
+    if classID == 7 then return "notneeded", {} end
+  end
   return "unknown", {}
 end
 
@@ -18,10 +24,13 @@ local function addTooltip(tooltip)
   tooltip:AddLine(" ")
   tooltip:AddLine("永恆專業助手", 0.35, 0.8, 0.65)
   if status == "needed" then
-    tooltip:AddLine("需要（已觀察到的專業配方）", 0.3, 1, 0.3)
+    tooltip:AddLine("需要（專業配方材料）", 0.3, 1, 0.3)
     for i = 1, math.min(4, #users) do tooltip:AddLine("  " .. users[i], 0.8, 0.9, 0.8) end
+  elseif status == "notneeded" then
+    tooltip:AddLine("不需要（同服目前專業配方未用到）", 1, 0.35, 0.35)
+    tooltip:AddLine("不代表沒有任務／交易等其他用途", 1, 0.7, 0.25)
   else
-    tooltip:AddLine("用途未確認（尚未載入完整配方資料）", 1, 0.75, 0.25)
+    tooltip:AddLine("用途未確認（配方資料不足或非一般材料）", 1, 0.75, 0.25)
   end
   tooltip:AddLine("同伺服器已記錄庫存：" .. total, 0.8, 0.8, 1)
   for i = 1, math.min(10, #rows) do
@@ -56,7 +65,15 @@ local function decorate(button)
     button.FPHMark = mark
   end
   local status = id and A:Classify(id) or "unknown"
-  if status == "needed" then button.FPHMark:Show() else button.FPHMark:Hide() end
+  if status == "needed" then
+    button.FPHMark:SetColorTexture(0.2, 1, 0.3, 0.85)
+    button.FPHMark:Show()
+  elseif status == "notneeded" then
+    button.FPHMark:SetColorTexture(1, 0.2, 0.2, 0.85)
+    button.FPHMark:Show()
+  else
+    button.FPHMark:Hide()
+  end
 end
 if type(ContainerFrame_Update) == "function" then
   hooksecurefunc("ContainerFrame_Update", function(frame)
