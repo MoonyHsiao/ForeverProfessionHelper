@@ -46,13 +46,6 @@ function A:GetStaticPlanSections(skillID)
   end
   self.selectedProfessionID = selected.id
   local guide = self.GetGatheringGuide and self:GetGatheringGuide(selected.id, selected.rank)
-  if selected.id == 182 or selected.id == 393 then
-    return {route = guide or self:T("GUIDE_UNAVAILABLE"), materials = self:T("GUIDE_UNAVAILABLE")}
-  end
-  if not self.recipeDatabaseReady then
-    return {route = self:T("PLAN_DB"), materials = self:T("PLAN_DB")}
-  end
-
   local capNotice
   local skillState = self:Character().professions[selected.id]
   local rank = tonumber(selected.rank) or 0
@@ -64,6 +57,15 @@ function A:GetStaticPlanSections(skillID)
       capNotice = self:T("SKILL_CAP_NEAR", cap - rank, cap)
     end
   end
+  if selected.id == 182 or selected.id == 393 then
+    local route = guide or self:T("GUIDE_UNAVAILABLE")
+    if capNotice then route = capNotice .. "\n\n" .. route end
+    return {route = route, materials = self:T("GUIDE_UNAVAILABLE")}
+  end
+  if not self.recipeDatabaseReady then
+    return {route = self:T("PLAN_DB"), materials = self:T("PLAN_DB")}
+  end
+
   local index = RecipeIndex(selected.id)
   local current = tonumber(selected.rank) or 1
   local projected = current
