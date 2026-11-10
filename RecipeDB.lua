@@ -1,139 +1,148 @@
 local _, ns = ...
 local A = ns.A
-
--- External Forever-aware recipe data: LibProfessionDB-1.0.
--- An absent or partially parsed catalog MUST NOT produce negative judgments.
-local index, covered, records, ingredients = {}, {}, 0, 0
-local nonCrafting = { [182]=true, [393]=true, [356]=true } -- herbalism, skinning, fishing
-
-local function add(itemID, skillID, recipeName)
-  itemID = tonumber(itemID)
-  if not itemID or itemID < 1 then return end
-  local perItem = index[itemID] or {}
-  index[itemID] = perItem
-  local names = perItem[skillID] or {}
-  perItem[skillID] = names
-  if #names < 3 then names[#names + 1] = tostring(recipeName or "?") end
-  ingredients = ingredients + 1
+-- LibProfessionDB is the source of truth. Never infer "safe to sell" from missing data.
+local index, catalog, coverage = {}, {}, {}
+local recipesParsed, reagentLinks = 0, 0
+local SKILLS = {129,164,165,171,185,186,197,202,333,356,393,755,773}
+local function NormalizeReagents(source)
+  local out = {}
+  if type(source) ~= "table" then return out end
+  for key, value in pairs(source) do
+    local id, count
+    if type(value) == "table" then
+      id = tonumber(value.itemID or value.itemId or value.id or value[1])
+      count = tonumber(value.quantity or value.count or value.amount or value[2]) or 1
+      if not id and type(key) == "number" and key > 100 then id = key end
+    elseif type(key) == "number" and key > 100 then
+      id, count = key, tonumber(value)
+    end
+    if id and id > 0 and count and count > 0 then out[id] = (out[id] or 0) + count end
+  end
+  return out
 end
 
-local function addReagents(skillID, name, recipe)
-  if type(recipe.reagents) ~= "table" then return end
-  for key, reagent in pairs(recipe.reagents) do
-    if type(reagent) == "number" and type(key) == "number" and key > 100 then
-      -- Map-style { [itemID] = count }
-      add(key, skillID, name)
-    elseif type(reagent) == "table" then
-      -- Array-style { { itemID=..., count=... }, ... }
-      local id = reagent.itemID or reagent.itemId or reagent.id or reagent[1]
-      if not id and type(key) == "number" and key > 100 then id = key end
-      add(id, skillID, name)
+local function Decode(skillID, spellID, info, db)
+  if type(info) ~= "table" then return end
+  local reagents = NormalizeReagents(info.reagents)
+  if not next(reagents) and type(db.GetReagents) == "function" then
+    local ok, data = pcall(db.GetReagents, db, skillID, spellID)
+    if ok then reagents = NormalizeReagents(data) end
+  end
+  if not next(reagents) then return end
+  local sources, sourceKinds
+  if type(db.GetRecipeSources) == "function" then
+    local ok, value = pcall(db.GetRecipeSources, db, spellID)
+    if ok then sources = value end
+  end
+  if type(db.GetRecipeSourceKinds) == "function" then
+    local ok, value = pcall(db.GetRecipeSourceKinds, db, spellID)
+    if ok then sourceKinds = value end
+  end
+  sourceKinds = type(sourceKinds) == "table" and sourceKinds or {}
+  if type(sources) == "table" then
+    for kind, entries in pairs(sources) do
+      if type(entries) == "table" and (#entries > 0 or (entries.total or 0) > 0) then sourceKinds[kind] = true end
     end
+  end
+  local difficulty = info.difficulty or {}
+  local recipe = {
+    id = spellID, skillID = skillID, name = info.name or tostring(spellID),
+    reagents = reagents, requiredSkill = tonumber(info.requiredSkill) or tonumber(difficulty[1]) or 1,
+    difficulty = difficulty,
+    craftedItemId = info.craftedItemId or info.craftedItemID,
+    sourceKinds = sourceKinds,
+    trainer = sourceKinds.trainer == true,
+    trainerNames = {},
+    borrowedSources = type(db.IsBorrowed) == "function" and db:IsBorrowed(spellID, "sources") ~= nil,
+    requiredSpec = info.requiredSpec,
+  }
+  if type(sources) == "table" and type(sources.trainer) == "table" then
+    for i = 1, math.min(#sources.trainer, 4) do
+      local npc = sources.trainer[i]
+      if type(npc) == "table" and npc.name then recipe.trainerNames[#recipe.trainerNames + 1] = npc.name end
+    end
+  end
+  if type(db.IsHiddenRecipe) == "function" then
+    local ok, hidden = pcall(db.IsHiddenRecipe, db, spellID)
+    if ok and hidden then recipe.hidden = true end
+  end
+  local perSkill = catalog[skillID] or {}
+  catalog[skillID] = perSkill
+  perSkill[#perSkill + 1] = recipe
+  recipesParsed = recipesParsed + 1
+  for itemID in pairs(reagents) do
+    local uses = index[itemID] or {}
+    index[itemID] = uses
+    uses[skillID] = true
+    reagentLinks = reagentLinks + 1
   end
 end
 
 function A:LoadRecipeDatabase()
-  index, covered, records, ingredients = {}, {}, 0, 0
-  -- ProfessionDB is the addon folder name; LibProfessionDB-1.0 is its library key.
-  -- Never register a third-party library ourselves, as that would mask a missing addon.
-  local addonLoaded = false
-  if C_AddOns and C_AddOns.IsAddOnLoaded then
-    addonLoaded = C_AddOns.IsAddOnLoaded("ProfessionDB")
-  elseif IsAddOnLoaded then
-    addonLoaded = IsAddOnLoaded("ProfessionDB")
-  end
-  if not addonLoaded then
-    local load = (C_AddOns and C_AddOns.LoadAddOn) or LoadAddOn
-    if load then pcall(load, "ProfessionDB") end
-  end
+  index, catalog, coverage, recipesParsed, reagentLinks = {}, {}, {}, 0, 0
   local lib = LibStub and LibStub("LibProfessionDB-1.0", true)
-  local status
-  if type(LibStub) ~= "function" and type(LibStub) ~= "table" then
-    status = "未偵測到 LibStub：請確認 Ace3 及資料庫依賴已啟用"
-  elseif not lib then
-    status = "找不到 LibProfessionDB-1.0：確認 AddOns 中 ProfessionDB 已啟用、版本為 Forever；插件目錄應為 ProfessionDB"
-  elseif type(lib.IsReady) ~= "function" then
-    status = "找到資料庫，但缺少 IsReady API（版本不相容）"
-  elseif not lib:IsReady() then
-    status = "找到 LibProfessionDB，但尚未載入配方資料；請確認安裝 Forever 對應版本"
-  elseif lib.GetGameVersion and lib:GetGameVersion() ~= "Forever" then
-    status = "資料庫並非《永恆》版本"
-  elseif not lib.GetRecipes or not lib.GetProfessions then
-    status = "LibProfessionDB 缺少必要 API"
-  else
-    -- GetProfessions() may return an array, map, or keyed metadata.
-    -- Prefer the stable Classic skill-line ids, then supplement from the library.
-    local ids = {
-      [129]=true, [164]=true, [165]=true, [171]=true, [185]=true,
-      [186]=true, [197]=true, [202]=true, [333]=true, [356]=true,
-      [393]=true, [755]=true, [773]=true,
-    }
-    local okList, list = pcall(lib.GetProfessions, lib)
-    if okList and type(list) == "table" then
-      for key, meta in pairs(list) do
-        local candidate
-        if type(meta) == "number" then candidate = meta
-        elseif type(meta) == "table" then
-          candidate = tonumber(meta.id or meta.skillLineID or meta.skillLineId or meta.professionID)
-        end
-        if candidate then ids[candidate] = true end
-        if type(key) == "number" and key > 100 then ids[key] = true end
-      end
-    end
-    for skillID in pairs(ids) do
-      local ok, recipes = pcall(lib.GetRecipes, lib, skillID)
-      if ok and type(recipes) == "table" then
-        local count, before = 0, ingredients
-        for spellID, entry in pairs(recipes) do
-          local actualSpellID = type(entry) == "number" and entry or tonumber(spellID)
-          local recipe = type(entry) == "table" and entry or nil
-          if not recipe and actualSpellID and lib.GetRecipe then
-            local okRecipe, result = pcall(lib.GetRecipe, lib, skillID, actualSpellID)
-            if okRecipe then recipe = result end
-          end
-          if type(recipe) == "table" then
-            -- Some versions expose ingredients through GetReagents rather than inline.
-            if type(recipe.reagents) ~= "table" and actualSpellID and lib.GetReagents then
-              local okReagents, reagents = pcall(lib.GetReagents, lib, skillID, actualSpellID)
-              if okReagents then
-                recipe = { name = recipe.name, reagents = reagents }
-              end
-            end
-            addReagents(skillID, recipe.name or tostring(actualSpellID or spellID), recipe)
-            count = count + 1
-          end
-        end
-        if count > 0 and ingredients > before then
-          covered[skillID] = true
-          records = records + count
-        end
-      end
-    end
-    if records == 0 then status = "未解析到配方材料；請輸入 /fph db 查看診斷" end
+  if not lib then
+    self.recipeDatabaseReady = false
+    self.recipeDatabaseStatus = "LibProfessionDB 未註冊（確認相依插件）"
+    return false, self.recipeDatabaseStatus
   end
-  -- A catalog that yields no usable ingredient ids is not safe for negative labels.
-  self.recipeDatabaseReady = records > 0 and ingredients > 0
-  self.recipeCount, self.reagentCount = records, ingredients
-  self.recipeCoverage = covered
-  self.recipeDatabaseStatus = self.recipeDatabaseReady and records or status
+  if type(lib.IsReady) ~= "function" or not lib:IsReady() then
+    self.recipeDatabaseReady = false
+    self.recipeDatabaseStatus = "資料庫尚未就緒"
+    return false, self.recipeDatabaseStatus
+  end
+  if type(lib.GetGameVersion) == "function" and lib:GetGameVersion() ~= "Forever" then
+    self.recipeDatabaseReady = false
+    self.recipeDatabaseStatus = "非 Forever 配方資料"
+    return false, self.recipeDatabaseStatus
+  end
+  if type(lib.GetRecipes) ~= "function" or type(lib.GetRecipe) ~= "function" then
+    self.recipeDatabaseReady = false
+    self.recipeDatabaseStatus = "函式庫缺少 GetRecipes / GetRecipe"
+    return false, self.recipeDatabaseStatus
+  end
+  for _, skillID in ipairs(SKILLS) do
+    local ok, entries = pcall(lib.GetRecipes, lib, skillID)
+    if ok and type(entries) == "table" then
+      local before = recipesParsed
+      for key, value in pairs(entries) do
+        local spellID = type(value) == "number" and value or tonumber(key)
+        local recipe = type(value) == "table" and value or nil
+        if spellID and not recipe then
+          local yes, data = pcall(lib.GetRecipe, lib, skillID, spellID)
+          if yes then recipe = data end
+        end
+        if spellID then Decode(skillID, spellID, recipe, lib) end
+      end
+      coverage[skillID] = recipesParsed > before
+    end
+  end
+  self.recipeCatalog = catalog
+  self.recipeCoverage = coverage
+  self.recipeCount = recipesParsed
+  self.reagentCount = reagentLinks
+  self.recipeDatabaseReady = recipesParsed > 0 and reagentLinks > 0
+  self.recipeDatabaseStatus = self.recipeDatabaseReady and recipesParsed or "沒有解析到配方材料"
   self:Notify("recipeDB")
   return self.recipeDatabaseReady, self.recipeDatabaseStatus
 end
 
+function A:GetRecipesForSkill(skillID)
+  return catalog[tonumber(skillID)] or {}
+end
+
 function A:RecipeUsers(itemID)
-  local users, found, complete, hasProfession = {}, false, self.recipeDatabaseReady and records >= 2000, false
+  local users, found, complete, hasProfession = {}, false, self.recipeDatabaseReady, false
   if not self.initialized then return "unknown", users end
   local uses = index[itemID] or {}
   for _, ch in pairs(self:Store().characters) do
     for id, skill in pairs(ch.professions or {}) do
-      hasProfession = true
       local skillID = tonumber(id)
-      if not skillID or (not covered[skillID] and not nonCrafting[skillID]) then
-        complete = false
-      end
-      if skillID and uses[skillID] then
-        found = true
+      hasProfession = true
+      if not coverage[skillID] and skillID ~= 182 and skillID ~= 393 and skillID ~= 356 then complete = false end
+      if uses[skillID] then
         users[#users + 1] = (skill.name or tostring(skillID)) .. " (" .. (ch.name or "?") .. ")"
+        found = true
       end
     end
   end
