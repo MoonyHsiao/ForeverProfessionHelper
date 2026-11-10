@@ -4,15 +4,15 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development branch — v1.2.3-dev** (based on stable v1.2.0). This release includes the profession dropdown, static leveling routes and prerequisite-crafting estimates. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+> **Development branch — v1.2.4-dev** (based on stable v1.2.0). This release includes the profession dropdown, static leveling routes and prerequisite-crafting estimates. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
 
 ## Branches and versioning
 
 - **`main`**: stable releases (current: v1.2.0).
 - **`develop`**: ongoing feature development. Changes should be reviewed before merging into `main`.
-- Development builds increment **only the patch component**, for example `v1.2.3-dev` → `v1.2.4-dev`. Do not increase the minor version for ordinary `develop` commits.
+- Development builds increment **only the patch component**, for example `v1.2.4-dev` → `v1.2.5-dev`. Do not increase the minor version for ordinary `develop` commits.
 - When a set of changes is promoted to the stable `main` branch, bump the stable release to the next minor version (for example, `v1.2.0`) and drop the `-dev` suffix. This repository uses `main`, not `master`.
-- After that release, continue new development builds from the released series by increasing only the patch version (for example, `v1.2.3-dev`).
+- After that release, continue new development builds from the released series by increasing only the patch version (for example, `v1.2.4-dev`).
 - Keep version numbers synchronized in `ForeverProfessionHelper.toc` and `Core.lua`.
 
 ## Requirements
@@ -43,6 +43,10 @@ To inspect library registration directly:
 ```
 
 A table indicates that the library object is registered; `nil` indicates that it is unavailable under this name.
+
+## Prerequisite recipe names (develop)
+
+Crafting-spell IDs in the route (for example leatherworking spell 3763, Fine Leather Belt, or 3817, Cured Medium Hide) now use localized LibProfessionDB recipe names first, game GetSpellInfo next, and an offline English OneForAll Forever fallback if neither can name an unlearned spell. This changes only labels, not quantities or route decisions.
 
 ## 1–300 route coverage (develop)
 
