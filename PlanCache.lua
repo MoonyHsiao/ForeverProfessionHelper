@@ -16,6 +16,22 @@ local function RecipeIndex(skillID)
   return bySpell
 end
 
+function A:GetEligibleProfessions()
+  local valid = {}
+  for id, skill in pairs(self:Character().professions or {}) do
+    local skillID = tonumber(id)
+    if skillID and (skillID == 182 or skillID == 186 or skillID == 393
+      or #self:GetRecipesForSkill(skillID) > 0) then
+      valid[#valid + 1] = {
+        id = skillID, rank = skill.rank or 0,
+        name = self:ProfessionName(skillID, skill.name),
+      }
+    end
+  end
+  table.sort(valid, function(a, b) return a.id < b.id end)
+  return valid
+end
+
 function A:GetCachedPrimaryPlanText(skillID)
   if not self.initialized then return self:T("CHAR_NOT_READY") end
   local valid = self:GetEligibleProfessions()
