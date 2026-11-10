@@ -4,7 +4,7 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development build — v0.3.4.** The addon has not been comprehensively tested in-game. Recipe metadata, trainer locations, price estimates, and UI behavior may be incomplete or inaccurate. See [SPEC.md](SPEC.md) for the agreed feature requirements.
+> **Development build — v0.4.0.** The addon has not been comprehensively tested in-game. Recipe metadata, trainer locations, price estimates, and UI behavior may be incomplete or inaccurate. See [SPEC.md](SPEC.md) for the agreed feature requirements.
 
 ## Requirements
 
@@ -35,6 +35,15 @@ To inspect library registration directly:
 ```
 
 A table indicates that the library object is registered; `nil` indicates that it is unavailable under this name.
+
+## Language settings
+
+The addon defaults to **Auto**, which follows the language of the WoW client via `GetLocale()`.
+
+- In the addon window, click **Language** to cycle through **Auto → Traditional Chinese → Simplified Chinese → English**. The override is saved account-wide in SavedVariables and takes effect immediately.
+- Client languages other than `zhTW`, `zhCN`, and `enUS` currently use English as the default.
+- Core UI, material/tooltips, leveling-plan labels, and guide instructions are localized. English gathering route names are included; some Simplified Chinese strings currently fall back to Traditional Chinese, and trainer names/recipe names originate from the game or LibProfessionDB and may not match the selected language.
+- Switching the addon language does not change the WoW client's language.
 
 ## OneForAll minimap button integration
 
