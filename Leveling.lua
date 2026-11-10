@@ -62,13 +62,13 @@ local function Score(recipe, stock, level)
   return { cost = total / chance, unknown = unknown, chance = chance, missing = missing }
 end
 function A:PlanProfession(skillID, target)
-  if not self.recipeDatabaseReady then return nil, "配方資料庫未就緒" end
+  if not self.recipeDatabaseReady then return nil, self:T("PLAN_DB") end
   local skill = self:Character().professions[tonumber(skillID)]
-  if not skill then return nil, "目前角色尚未學習這個專業" end
+  if not skill then return nil, self:T("PLAN_NOT_LEARNED_PROF") end
   local current = tonumber(skill.rank) or 1
   target = math.min(300, tonumber(target) or 300)
   local recipes = self:GetRecipesForSkill(skillID)
-  if #recipes == 0 then return nil, "沒有可用的製造配方；採集專業請參考文字指南" end
+  if #recipes == 0 then return nil, self:T("PLAN_NO_RECIPES") end
   local stock = Holdings(self)
   local lines, shopping, steps, unresolved = {}, {}, 0, false
   local diagnostic = { available = #recipes, trainer = 0, learnable = 0, difficultyUnknown = 0 }
@@ -138,8 +138,8 @@ function A:PlanSummary(skillID, target)
   local result, err = self:PlanProfession(skillID, target)
   if not result then return err end
   local textLines = {
-    "專業 " .. tostring(skillID) .. "，預估 " .. result.from .. " → " .. result.to .. " / " .. result.target,
-    "規劃：貪婪估算，非全域最佳解；技能機率與材料數皆為預估。",
+    self:T("PLAN_HEADER", tostring(skillID), result.from, result.to, result.target),
+    self:T("PLAN_DISCLAIMER"),
   }
   for i, stage in ipairs(result.lines) do
     local r = stage.recipe
@@ -147,52 +147,52 @@ function A:PlanSummary(skillID, target)
       stage.from, stage.to, r.name, stage.crafts)
     local learned = self:RecipeLearned(r.id)
     if learned == true then
-      textLines[#textLines + 1] = "  已學會"
+      textLines[#textLines + 1] = self:T("LEARNED")
     else
-      local state = learned == false and "尚未學會" or "尚未確認是否學會（開啟專業視窗可改善偵測）"
-      textLines[#textLines + 1] = "  " .. state .. "；訓練師配方"
-      textLines[#textLines + 1] = "  學習條件：專業技能至少 " .. tostring(r.requiredSkill or "未收錄")
+      local state = learned == false and self:T("NOT_LEARNED") or self:T("LEARN_UNKNOWN")
+      textLines[#textLines + 1] = "  " .. state .. "; " .. self:T("TRAINER_RECIPE")
+      textLines[#textLines + 1] = self:T("SKILL_REQUIREMENT", tostring(r.requiredSkill or "?"))
       local shown = 0
       for _, name in ipairs(r.trainerNames or {}) do
-        textLines[#textLines + 1] = "  找 " .. name .. "： " .. self:TrainerLocation(r.skillID, name)
+        textLines[#textLines + 1] = self:T("TRAINER_AT", name, self:TrainerLocation(r.skillID, name))
         shown = shown + 1
       end
       if shown == 0 then
         local fallback = self:TrainerFallback(r.skillID)
-        textLines[#textLines + 1] = "  無法確認此配方的指定訓練師。"
+        textLines[#textLines + 1] = self:T("TRAINER_UNCONFIRMED")
         if fallback then
-          textLines[#textLines + 1] = "  可先詢問同專業訓練師：" .. fallback .. "（Classic 資料，不能保證教授此配方）"
+          textLines[#textLines + 1] = self:T("TRAINER_SUGGEST", fallback)
         end
       end
       if r.borrowedSources then
-        textLines[#textLines + 1] = "  注意：訓練師來源沿用 Vanilla，永恆版本尚未確認。"
+        textLines[#textLines + 1] = self:T("TRAINER_BORROWED")
       end
     end
     if i >= 35 then
-      textLines[#textLines + 1] = "其餘階段未顯示；可提高專業等級後重新查看。"
+      textLines[#textLines + 1] = self:T("MORE_STAGES")
       break
     end
   end
   if result.incomplete then
-    textLines[#textLines + 1] = "路線未完成：無符合條件且具備技能機率的訓練師配方。"
+    textLines[#textLines + 1] = self:T("PLAN_INCOMPLETE")
     local d = result.diagnostics or {}
-    textLines[#textLines + 1] = string.format("診斷：配方 %d、訓練師來源 %d、目前可學 %d、技能區間缺漏 %d", d.available or 0, d.trainer or 0, d.learnable or 0, d.difficultyUnknown or 0)
+    textLines[#textLines + 1] = string.format(self:T("PLAN_DIAGNOSTIC"), d.available or 0, d.trainer or 0, d.learnable or 0, d.difficultyUnknown or 0)
   end
-  textLines[#textLines + 1] = "缺少材料（跨角色庫存已扣除）："
+  textLines[#textLines + 1] = self:T("SHOPPING")
   local ids = {}
   for id in pairs(result.shopping) do ids[#ids + 1] = id end
   table.sort(ids)
   for i, id in ipairs(ids) do
-    textLines[#textLines + 1] = string.format("  %s ×%d", (GetItemInfo and GetItemInfo(id)) or ("物品 " .. id), result.shopping[id])
-    if i >= 35 then textLines[#textLines + 1] = "購物清單較長，僅顯示前 35 項"; break end
+    textLines[#textLines + 1] = string.format("  %s ×%d", (GetItemInfo and GetItemInfo(id)) or (self:T("ITEM_FALLBACK", id)), result.shopping[id])
+    if i >= 35 then textLines[#textLines + 1] = self:T("SHOPPING_MORE"); break end
   end
-  textLines[#textLines + 1] = string.format("已知 Auctionator 額外成本（不含未知價格）：%dg %ds %dc",
+  textLines[#textLines + 1] = string.format(self:T("COST"),
     math.floor(result.estimatedExtraCopper / 10000),
     math.floor(result.estimatedExtraCopper % 10000 / 100),
     math.floor(result.estimatedExtraCopper % 100))
-  if result.missingPrices then textLines[#textLines + 1] = "部分材料價格未知，推薦結果不保證最低成本。" end
+  if result.missingPrices then textLines[#textLines + 1] = self:T("PRICES_INCOMPLETE") end
   if #result.unknownPrices > 0 then
-    textLines[#textLines + 1] = "注意：" .. #result.unknownPrices .. " 種材料價格未知，以上不是總成本。"
+    textLines[#textLines + 1] = self:T("PRICE_NOTE", #result.unknownPrices)
   end
   return table.concat(textLines, "\n")
 end
@@ -213,9 +213,9 @@ function A:GetEligibleProfessions()
   return valid
 end
 function A:GetPrimaryPlanText(skillID)
-  if not self.initialized then return "角色資料尚未就緒" end
+  if not self.initialized then return self:T("CHAR_NOT_READY") end
   local valid = self:GetEligibleProfessions()
-  if #valid == 0 then return "沒有可規劃的專業，或配方資料庫尚未就緒。" end
+  if #valid == 0 then return self:T("NO_ELIGIBLE") end
   local selection
   for _, profession in ipairs(valid) do
     if tonumber(skillID) == profession.id then selection = profession; break end
@@ -224,7 +224,7 @@ function A:GetPrimaryPlanText(skillID)
   self.selectedProfessionID = selection.id
   local guide = self.GetGatheringGuide and self:GetGatheringGuide(selection.id, selection.rank)
   if selection.id == 182 or selection.id == 393 then
-    return guide or "採集指南尚未就緒"
+    return guide or self:T("GUIDE_UNAVAILABLE")
   end
   local plan = selection.name .. " " .. selection.rank .. "/300\n\n" ..
     self:PlanSummary(selection.id, 300)
