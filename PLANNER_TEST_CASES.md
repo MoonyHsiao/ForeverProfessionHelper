@@ -31,6 +31,24 @@ If a later stage requires **4** Fine Leather Belts instead, only the shortage of
 4. Track how many of these generated outputs later get reused.
 5. Keep the original stock snapshot untouched; no actual in-game actions are performed.
 6. Items with missing output IDs are **not** credited. Craft quantities and skill-up probabilities are still estimates.
-7. Do not make assumptions that the optimal earlier craft will always produce the needed ingredient; this fix links **already selected stages**, but is not a full dependency optimizer.
+7. Evaluate up to three layers of same-profession prerequisites using a make-versus-buy heuristic. These choices and skill estimates are not a global optimum.
 
 Reference: [OneForAll Forever Leatherworking data](https://github.com/smoergi/OneForAll_Forever/blob/main/OneForAll/Data/Professions/Leatherworking.lua).
+
+## Intermediate crafts that also level the profession
+
+When crafting **Fine Leather Belt** at skill 100 (green), assume an estimated **0.25** skill gain, followed by **Dark Leather Belt** (orange), assumed to award **1.00** skill.
+
+Expected sequence:
+
+1. Craft one Fine Leather Belt (expected +0.25).
+2. Use it to craft one Dark Leather Belt (expected +1.00).
+3. The model advances from **100 to 101.25** expected skill, not 101.
+4. Recalculate recipe color and availability at the new expected skill before the next planned craft.
+5. If the Fine Leather Belt is much cheaper to buy, buying may win the make-versus-buy comparison; no prerequisite gain is credited in that case.
+6. If the prerequisite is gray at the current skill, it yields **0** expected skill but can still supply an intermediate material.
+7. Do not treat a prerequisite from another profession as craftable. Existing stock from another character remains usable.
+
+**Probability model**: orange 1.0, yellow 0.75, green 0.25, gray 0. These are approximate expectations, not deterministic guaranteed skill-ups.
+
+Regression script: `tests/planner_prerequisites.lua`. It is written for Lua 5.1+ with mocked profession records; it must be run separately and is not a WoW addon file.
