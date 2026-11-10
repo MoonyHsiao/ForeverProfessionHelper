@@ -1,7 +1,8 @@
 local _, ns = ...
 local A = ns.A
--- Approximate greedy planner: each step minimizes extra acquisition cost per
--- expected skill point. It is NOT a globally optimal shortest-path solver.
+-- Static skill-focused planner: prioritize orange/yellow trainer recipes and
+-- approximate raw reagent units per expected skill point. No price or real
+-- inventory inputs are used. This is not a globally optimal route.
 -- Prefer Forever-specific thresholds from OneForAll. Fall back to
 -- LibProfessionDB difficulty data for recipes absent from the numeric dataset.
 local function SkillChance(recipe, level)
@@ -45,7 +46,7 @@ local function Score(recipe, simulatedStock, produced, craftingIndex, level)
 end
 
 -- Candidate lists are stable for a given profession/skill level. Build them
--- once; changing stock/prices never requires rescanning all recipe metadata.
+-- once; inventory and market prices never affect eligibility.
 local candidateIndex = {}
 function A:GetLevelingCandidates(skillID, recipes, level)
   skillID = tonumber(skillID)
