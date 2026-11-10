@@ -205,7 +205,7 @@ function A:GetEligibleProfessions()
     if skillID and (#self:GetRecipesForSkill(skillID) > 0 or
       skillID == 182 or skillID == 186 or skillID == 393) then
       valid[#valid + 1] = {
-        id = skillID, rank = skill.rank or 0, name = skill.name or tostring(skillID),
+        id = skillID, rank = skill.rank or 0, name = self:ProfessionName(skillID, skill.name),
       }
     end
   end
