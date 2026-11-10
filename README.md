@@ -4,13 +4,13 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development branch — v1.1.2-dev** (based on stable v1.1.0). This release includes the profession dropdown, static leveling routes and prerequisite-crafting estimates. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+> **Stable release — v1.2.0.** This release includes the profession dropdown, static leveling routes and prerequisite-crafting estimates. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
 
 ## Branches and versioning
 
-- **`main`**: stable releases (current: v1.1.0).
+- **`main`**: stable releases (current: v1.2.0).
 - **`develop`**: ongoing feature development. Changes should be reviewed before merging into `main`.
-- Development builds increment **only the patch component**, for example `v1.1.2-dev` → `v1.1.3-dev`. Do not increase the minor version for ordinary `develop` commits.
+- Development builds increment **only the patch component**, for example `v1.2.1-dev` → `v1.2.2-dev`. Do not increase the minor version for ordinary `develop` commits.
 - When a set of changes is promoted to the stable `main` branch, bump the stable release to the next minor version (for example, `v1.2.0`) and drop the `-dev` suffix. This repository uses `main`, not `master`.
 - After that release, continue new development builds from the released series by increasing only the patch version (for example, `v1.2.1-dev`).
 - Keep version numbers synchronized in `ForeverProfessionHelper.toc` and `Core.lua`.
