@@ -4,13 +4,13 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development branch — v1.1.7-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+> **Stable release — v1.1.0.** This release includes the profession dropdown, static leveling routes and prerequisite-crafting estimates. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
 
 ## Branches and versioning
 
-- **`main`**: the v1.0.0 baseline and future stable releases.
+- **`main`**: stable releases (current: v1.1.0).
 - **`develop`**: ongoing feature development. Changes should be reviewed before merging into `main`.
-- Development builds increment **only the patch component**: `v1.1.7-dev` → `v1.1.8-dev` → `v1.1.9-dev`. Do not increase the minor version for ordinary `develop` commits.
+- Development builds increment **only the patch component**, for example `v1.1.8-dev` → `v1.1.9-dev`. Do not increase the minor version for ordinary `develop` commits.
 - When a set of changes is promoted to the stable `main` branch, bump the stable release to the next minor version (for example, `v1.2.0`) and drop the `-dev` suffix. This repository uses `main`, not `master`.
 - After that release, continue new development builds from the released series by increasing only the patch version (for example, `v1.2.1-dev`).
 - Keep version numbers synchronized in `ForeverProfessionHelper.toc` and `Core.lua`.
@@ -101,7 +101,7 @@ Example: **Fine Leather Belt (item 4246) → Dark Leather Belt**. Belts crafted 
 
 The offline route generator expands selected same-profession intermediate reagents where supported by the source dataset. Intermediate crafts are shown before the stage that consumes them. The recipe output mapping comes from OneForAll Forever for recipes whose LibProfessionDB crafted-item ID is absent. The planner still uses local greedy decisions; it is not yet a globally optimized route. It assumes one crafted item per operation unless recipe yield metadata is explicitly provided, and it only credits outputs with a valid crafted item ID.
 
-Prerequisite crafts now contribute **estimated skill gains** before the parent recipe is simulated. Static route entries already account for estimated prerequisite skill gains and display those estimates next to prerequisite crafts. Yellow/green gains remain probability-based estimates, not guaranteed results. The offline generator compares expected skill gains and raw-material counts, not market prices. Cross-profession crafting is deliberately excluded: prerequisites must belong to the selected profession. An isolated Lua regression script is available at `tests/planner_prerequisites.lua` (not loaded by WoW). See [PLANNER_TEST_CASES.md](PLANNER_TEST_CASES.md) for the expected belt example. Changes in `develop` are not included in stable `main` until merged.
+Prerequisite crafts now contribute **estimated skill gains** before the parent recipe is simulated. Static route entries already account for estimated prerequisite skill gains and display those estimates next to prerequisite crafts. Yellow/green gains remain probability-based estimates, not guaranteed results. The offline generator compares expected skill gains and raw-material counts, not market prices. Cross-profession crafting is deliberately excluded: prerequisites must belong to the selected profession. An isolated Lua regression script is available at `tests/planner_prerequisites.lua` (not loaded by WoW). See [PLANNER_TEST_CASES.md](PLANNER_TEST_CASES.md) for the expected belt example. These features are included in stable v1.1.0.
 
 ## Offline precomputed leveling routes (develop)
 
