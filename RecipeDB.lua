@@ -83,22 +83,22 @@ function A:LoadRecipeDatabase()
   local lib = LibStub and LibStub("LibProfessionDB-1.0", true)
   if not lib then
     self.recipeDatabaseReady = false
-    self.recipeDatabaseStatus = "LibProfessionDB 未註冊（確認相依插件）"
+    self.recipeDatabaseStatus = self:T("DB_MISSING")
     return false, self.recipeDatabaseStatus
   end
   if type(lib.IsReady) ~= "function" or not lib:IsReady() then
     self.recipeDatabaseReady = false
-    self.recipeDatabaseStatus = "資料庫尚未就緒"
+    self.recipeDatabaseStatus = self:T("DB_WAIT")
     return false, self.recipeDatabaseStatus
   end
   if type(lib.GetGameVersion) == "function" and lib:GetGameVersion() ~= "Forever" then
     self.recipeDatabaseReady = false
-    self.recipeDatabaseStatus = "非 Forever 配方資料"
+    self.recipeDatabaseStatus = self:T("DB_WRONG")
     return false, self.recipeDatabaseStatus
   end
   if type(lib.GetRecipes) ~= "function" or type(lib.GetRecipe) ~= "function" then
     self.recipeDatabaseReady = false
-    self.recipeDatabaseStatus = "函式庫缺少 GetRecipes / GetRecipe"
+    self.recipeDatabaseStatus = self:T("DB_API")
     return false, self.recipeDatabaseStatus
   end
   for _, skillID in ipairs(SKILLS) do
@@ -122,7 +122,7 @@ function A:LoadRecipeDatabase()
   self.recipeCount = recipesParsed
   self.reagentCount = reagentLinks
   self.recipeDatabaseReady = recipesParsed > 0 and reagentLinks > 0
-  self.recipeDatabaseStatus = self.recipeDatabaseReady and recipesParsed or "沒有解析到配方材料"
+  self.recipeDatabaseStatus = self.recipeDatabaseReady and recipesParsed or self:T("DB_EMPTY")
   self:Notify("recipeDB")
   return self.recipeDatabaseReady, self.recipeDatabaseStatus
 end
