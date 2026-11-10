@@ -4,7 +4,7 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Stable release — v1.2.0.** This release includes the profession dropdown, static leveling routes and prerequisite-crafting estimates. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+> **Development branch — v1.2.1-dev** (based on stable v1.2.0). This release includes the profession dropdown, static leveling routes and prerequisite-crafting estimates. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
 
 ## Branches and versioning
 
@@ -43,6 +43,12 @@ To inspect library registration directly:
 ```
 
 A table indicates that the library object is registered; `nil` indicates that it is unavailable under this name.
+
+## Training cap alerts and interactive recipes (develop)
+
+The leveling route shows an alert when the current profession is within five points of its known 75/150/225 training cap, or has already reached that cap. The alert uses the **actual character skill maximum**, not an inferred trainer location. The advice applies to gathering guides too.
+
+The route tab displays interactive recipe rows with the **first recommended stage highlighted**. Hovering a stage shows a game-native crafted-item or spell tooltip when available, plus the recipe reagent list from LibProfessionDB. If the game API cannot supply a native tooltip, the addon shows a recipe-name fallback. Materials and inventory tabs remain text views. The addon still uses only precomputed static route data, not a background solver.
 
 ## Three-tab interface (develop)
 
