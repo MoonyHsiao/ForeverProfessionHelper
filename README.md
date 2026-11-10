@@ -4,15 +4,15 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development branch — v1.2.1-dev** (based on stable v1.2.0). This release includes the profession dropdown, static leveling routes and prerequisite-crafting estimates. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+> **Development branch — v1.2.2-dev** (based on stable v1.2.0). This release includes the profession dropdown, static leveling routes and prerequisite-crafting estimates. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
 
 ## Branches and versioning
 
 - **`main`**: stable releases (current: v1.2.0).
 - **`develop`**: ongoing feature development. Changes should be reviewed before merging into `main`.
-- Development builds increment **only the patch component**, for example `v1.2.1-dev` → `v1.2.2-dev`. Do not increase the minor version for ordinary `develop` commits.
+- Development builds increment **only the patch component**, for example `v1.2.2-dev` → `v1.2.2-dev`. Do not increase the minor version for ordinary `develop` commits.
 - When a set of changes is promoted to the stable `main` branch, bump the stable release to the next minor version (for example, `v1.2.0`) and drop the `-dev` suffix. This repository uses `main`, not `master`.
-- After that release, continue new development builds from the released series by increasing only the patch version (for example, `v1.2.1-dev`).
+- After that release, continue new development builds from the released series by increasing only the patch version (for example, `v1.2.2-dev`).
 - Keep version numbers synchronized in `ForeverProfessionHelper.toc` and `Core.lua`.
 
 ## Requirements
@@ -43,6 +43,10 @@ To inspect library registration directly:
 ```
 
 A table indicates that the library object is registered; `nil` indicates that it is unavailable under this name.
+
+## Material name resolution (develop)
+
+All material quantities continue to come from the fixed static leveling route. Item labels first use the WoW client's localized `GetItemInfo` data. When the item is not cached yet, an English offline fallback from OneForAll Forever is displayed instead of a bare numeric item ID; the addon requests missing item data and refreshes visible material, inventory and tooltip text when `GET_ITEM_INFO_RECEIVED` reports availability. Items missing from both sources still display an item-ID fallback. No background route calculation is added.
 
 ## Training cap alerts and interactive recipes (develop)
 
