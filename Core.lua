@@ -51,6 +51,7 @@ function A:Initialize()
   ch.lastLogin = self:Time()
   self.initialized = true
   self:ScanProfessions()
+  self:LoadRecipeDatabase()
   self:ScanBags()
   self:Print("已載入。輸入 /fph 開啟視窗。")
 end
@@ -84,7 +85,10 @@ SLASH_FOREVERPROFESSIONHELPER1 = "/fph"
 SlashCmdList.FOREVERPROFESSIONHELPER = function(message)
   message = (message or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
   if not A.initialized then return end
-  if message == "scan" then
+  if message == "db" then
+    local ready, status = A:LoadRecipeDatabase()
+    A:Print("配方資料庫：" .. (ready and "已載入 " or "無法載入：") .. tostring(status))
+  elseif message == "scan" then
     A:ScanBags()
     if A.bankOpen then A:ScanBank() end
     A:ScanProfessions()
