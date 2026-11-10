@@ -10,7 +10,10 @@ Track profession reagents and inventory across characters on the same realm, ins
 
 - **`main`**: the v1.0.0 baseline and future stable releases.
 - **`develop`**: ongoing feature development. Changes should be reviewed before merging into `main`.
-- Version numbers are kept in `ForeverProfessionHelper.toc` and `Core.lua`.
+- Development builds increment **only the patch component**: `v1.1.2-dev` → `v1.1.3-dev` → `v1.1.4-dev`. Do not increase the minor version for ordinary `develop` commits.
+- When a set of changes is promoted to the stable `main` branch, bump the stable release to the next minor version (for example, `v1.2.0`) and drop the `-dev` suffix. This repository uses `main`, not `master`.
+- After that release, continue new development builds from the released series by increasing only the patch version (for example, `v1.2.1-dev`).
+- Keep version numbers synchronized in `ForeverProfessionHelper.toc` and `Core.lua`.
 
 ## Requirements
 
