@@ -1,6 +1,14 @@
 local _, ns = ...
 local A = ns.A
-local frame, body, activeMode, title, scanButton, planButton, cycleButton, languageButton, languageMenu = nil, nil, "overview"
+local frame, body, activeMode, title, scanButton, cycleButton, languageButton, languageMenu, professionMenu = nil, nil, "overview"
+-- The planner is prepared after login by PlanCache.lua. The buttons
+-- only read cached results; they never run the recipe solver.
+local function CancelPlan() end
+local function StartPlan()
+  if not frame or not body then return end
+  activeMode = "plan"
+  body:SetText(A:GetCachedPrimaryPlanText(A.selectedProfessionID))
+end
 local function sortedKeys(map)
   local keys = {}
   for key in pairs(map or {}) do keys[#keys + 1] = key end
@@ -69,34 +77,64 @@ function A:ShowWindow(showPlan)
       if A.bankOpen then A:ScanBank() end
       A:ScanProfessions()
       A:ScanKnownRecipes()
+      CancelPlan()
       activeMode = "overview"
       body:SetText(A:BuildOverview())
     end)
-    planButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    planButton:SetSize(115, 23)
-    planButton:SetPoint("RIGHT", scanButton, "LEFT", -6, 0)
-    planButton:SetText(A:T("PLAN"))
-    planButton:SetScript("OnClick", function()
-      activeMode = "plan"
-      body:SetText(A:GetPrimaryPlanText(A.selectedProfessionID))
-    end)
     cycleButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     cycleButton:SetSize(115, 23)
-    cycleButton:SetPoint("RIGHT", planButton, "LEFT", -6, 0)
+    cycleButton:SetPoint("RIGHT", scanButton, "LEFT", -6, 0)
     cycleButton:SetText(A:T("SWITCH"))
-    cycleButton:SetScript("OnClick", function()
+    -- Rebuild options on open: learned professions and locale can change.
+    -- Keep buttons around instead of allocating new frames each click.
+    professionMenu = CreateFrame("Frame", nil, frame)
+    professionMenu:SetFrameStrata("DIALOG")
+    professionMenu:SetFrameLevel(frame:GetFrameLevel() + 30)
+    professionMenu:SetWidth(210)
+    professionMenu:SetPoint("BOTTOMLEFT", cycleButton, "TOPLEFT", 0, 3)
+    local professionBackground = professionMenu:CreateTexture(nil, "BACKGROUND")
+    professionBackground:SetAllPoints()
+    professionBackground:SetColorTexture(0.07, 0.07, 0.08, 0.97)
+    local professionOptions = {}
+    local function RefreshProfessionMenu()
       local list = A:GetEligibleProfessions()
-      if #list == 0 then return end
-      local nextIndex = 1
-      for i, skill in ipairs(list) do
-        if skill.id == A.selectedProfessionID then
-          nextIndex = i % #list + 1
-          break
+      for i, profession in ipairs(list) do
+        local option = professionOptions[i]
+        if not option then
+          option = CreateFrame("Button", nil, professionMenu)
+          option:SetSize(206, 26)
+          option:SetPoint("TOPLEFT", 2, -2 - (i - 1) * 27)
+          option:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+          option.label = option:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+          option.label:SetPoint("LEFT", 9, 0)
+          option.label:SetPoint("RIGHT", -8, 0)
+          option.label:SetJustifyH("LEFT")
+          professionOptions[i] = option
         end
+        option.label:SetText(profession.name .. " " .. tostring(profession.rank) .. "/300"
+          .. (profession.id == A.selectedProfessionID and " |cff55ccaa*|r" or ""))
+        local selectedID = profession.id
+        option:SetScript("OnClick", function()
+          professionMenu:Hide()
+          A.selectedProfessionID = selectedID
+          StartPlan()
+        end)
+        option:Show()
       end
-      A.selectedProfessionID = list[nextIndex].id
-      activeMode = "plan"
-      body:SetText(A:GetPrimaryPlanText(A.selectedProfessionID))
+      for i = #list + 1, #professionOptions do
+        professionOptions[i]:Hide()
+      end
+      professionMenu:SetHeight(math.max(4, #list * 27 + 4))
+      return #list > 0
+    end
+    professionMenu:Hide()
+    cycleButton:SetScript("OnClick", function()
+      if professionMenu:IsShown() then
+        professionMenu:Hide()
+      elseif RefreshProfessionMenu() then
+        if languageMenu then languageMenu:Hide() end
+        professionMenu:Show()
+      end
     end)
     languageButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     languageButton:SetSize(118, 23)
@@ -132,31 +170,43 @@ function A:ShowWindow(showPlan)
     end
     languageMenu:Hide()
     languageButton:SetScript("OnClick", function()
-      if languageMenu:IsShown() then languageMenu:Hide() else languageMenu:Show() end
+      if languageMenu:IsShown() then
+        languageMenu:Hide()
+      else
+        if professionMenu then professionMenu:Hide() end
+        languageMenu:Show()
+      end
     end)
-    frame:HookScript("OnHide", function() languageMenu:Hide() end)
-    self:RegisterView("overview", function()
+    frame:HookScript("OnHide", function()
+      languageMenu:Hide()
+      professionMenu:Hide()
+    end)
+    self:RegisterView("overview", function(reason)
       title:SetText(A:T("TITLE") .. " " .. A.version)
       scanButton:SetText(A:T("SCAN"))
-      planButton:SetText(A:T("PLAN"))
       cycleButton:SetText(A:T("SWITCH"))
       languageButton:SetText(A:T("LANGUAGE") .. ": " .. (A.languageNames[A.db.language or "auto"] or "Auto"))
       if frame:IsShown() then
-        body:SetText(activeMode == "plan" and A:GetPrimaryPlanText(A.selectedProfessionID) or A:BuildOverview())
+        if activeMode == "plan" then
+          -- planReady updates the text without launching a calculation.
+          -- Stock and profession updates mark cache stale in PlanCache.lua.
+          StartPlan()
+        else
+          body:SetText(A:BuildOverview())
+        end
       end
     end)
   end
   if title then
     title:SetText(self:T("TITLE") .. " " .. self.version)
     scanButton:SetText(self:T("SCAN"))
-    planButton:SetText(self:T("PLAN"))
     cycleButton:SetText(self:T("SWITCH"))
     languageButton:SetText(self:T("LANGUAGE") .. ": " .. (self.languageNames[self.db.language or "auto"] or "Auto"))
   end
   if showPlan and self.GetPrimaryPlanText then
-    activeMode = "plan"
-    body:SetText(self:GetPrimaryPlanText(self.selectedProfessionID))
+    StartPlan()
   else
+    CancelPlan()
     activeMode = "overview"
     body:SetText(self:BuildOverview())
   end

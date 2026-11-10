@@ -1,17 +1,19 @@
 ## Interface: 16001
 ## Title: Forever Profession Helper |cff88ccff(永恆專業助手)|r
 ## Notes: Same-realm professions and inventory snapshots
-## Version: 1.0.0
-## OptionalDeps: ProfessionDB, Auctionator
+## Version: 1.1.0
+## OptionalDeps: ProfessionDB
 ## SavedVariables: ForeverProfessionHelperDB
 Core.lua
 Locales.lua
 Inventory.lua
 Professions.lua
 RecipeDB.lua
+OneForAllCraftOutputs.lua
 OneForAllSkillColors.lua
 TrainerLocations.lua
-Leveling.lua
+StaticRoutes.lua
+PlanCache.lua
 Gathering.lua
 Items.lua
 UI.lua
