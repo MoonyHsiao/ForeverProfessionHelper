@@ -12,6 +12,7 @@ RecipeDB.lua
 OneForAllCraftOutputs.lua
 OneForAllSkillColors.lua
 TrainerLocations.lua
+CraftingDependencies.lua
 Leveling.lua
 Gathering.lua
 Items.lua
