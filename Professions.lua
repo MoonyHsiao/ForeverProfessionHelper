@@ -52,7 +52,7 @@ function A:ObservedItemUsers(itemID)
   for _, ch in pairs(self:Store().characters) do
     for skillID, isReagent in pairs((ch.observedReagents or {})[itemID] or {}) do
       if isReagent and ch.professions and ch.professions[skillID] then
-        users[#users + 1] = ch.professions[skillID].name .. " (" .. (ch.name or "?") .. ")"
+        users[#users + 1] = self:ProfessionName(skillID, ch.professions[skillID].name) .. " (" .. (ch.name or "?") .. ")"
       end
     end
   end
