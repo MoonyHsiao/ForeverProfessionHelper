@@ -22,8 +22,8 @@ local FALLBACK = {
 }
 function A:TrainerLocation(skillID, npcName)
   local entry = npcName and NPCS[npcName]
-  if entry then return entry[1] .. "（" .. entry[2] .. "）[Classic 位置，永恆待驗證]" end
-  return "該訓練師位置尚未收錄"
+  if entry then return self:T("TRAINER_LOCATION_CLASSIC", entry[1], entry[2]) end
+  return self:T("TRAINER_LOCATION_MISSING")
 end
 function A:TrainerFallback(skillID)
   local faction = UnitFactionGroup and UnitFactionGroup("player")
