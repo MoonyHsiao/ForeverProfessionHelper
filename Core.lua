@@ -1,11 +1,11 @@
 local addonName, ns = ...
 local A = CreateFrame("Frame")
 ns.A = A
-A.version = "0.3.4"
+A.version = "0.4.0"
 A.listeners = {}
 
 function A:Print(message)
-  print("|cff55ccaa永恆專業助手|r " .. tostring(message))
+  print("|cff55ccaa" .. (self.T and self:T("TITLE") or "Forever Profession Helper") .. "|r " .. tostring(message))
 end
 function A:Realm()
   local name = (GetNormalizedRealmName and GetNormalizedRealmName()) or GetRealmName() or "UNKNOWN"
