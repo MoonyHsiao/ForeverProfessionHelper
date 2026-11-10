@@ -169,7 +169,7 @@ function A:GetStaticPlanSections(skillID)
     materialLines[#materialLines + 1] = self:T("MATERIALS_EMPTY")
   end
   for _, id in ipairs(ids) do
-    local itemName = (GetItemInfo and GetItemInfo(id)) or self:T("ITEM_FALLBACK", id)
+    local itemName = self:DisplayItemName(id)
     materialLines[#materialLines + 1] = string.format("  %s x%d", itemName, materials[id])
   end
   return {
