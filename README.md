@@ -4,7 +4,7 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development branch — v1.1.4-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, cost estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+> **Development branch — v1.1.4-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, skill-up estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
 
 ## Branches and versioning
 
@@ -95,7 +95,7 @@ Integration is based on the [OneForAll Forever 6.2.2 minimap collector](https://
 
 ## Reuse of crafted intermediate items (develop)
 
-The planner now simulates **crafted output items** as well as reagent consumption. When an earlier stage creates an item required by a later recipe, the later stage uses the simulated stock before adding any missing amount to the shopping list.
+The planner now simulates **crafted output items** as well as reagent consumption. When an earlier stage creates an item required by a later recipe, the later stage uses the simulated stock before adding additional raw material requirements.
 
 Example: **Fine Leather Belt (item 4246) → Dark Leather Belt**. Belts crafted earlier in the selected route are counted as available materials for the later step. The recommendation output also lists how many intermediate items were reused.
 
