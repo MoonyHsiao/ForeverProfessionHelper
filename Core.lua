@@ -1,7 +1,7 @@
 local addonName, ns = ...
 local A = CreateFrame("Frame")
 ns.A = A
-A.version = "1.1.3-dev"
+A.version = "1.1.4-dev"
 A.listeners = {}
 
 function A:Print(message)
@@ -113,7 +113,6 @@ SlashCmdList.FOREVERPROFESSIONHELPER = function(message)
     if A.bankOpen then A:ScanBank() end
     A:ScanProfessions()
     A:ScanKnownRecipes()
-    A:InvalidatePlanCache("manual")
     A:Print(A:T("RESCANNED"))
   elseif message == "help" then
     A:Print(A:T("CHAT_HELP"))
