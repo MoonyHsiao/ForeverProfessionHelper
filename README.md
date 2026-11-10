@@ -1,68 +1,88 @@
-# Forever Profession Helper（永恆專業助手）
+# Forever Profession Helper
 
-WoW Forever 1.60.1 專業材料管理、同伺服器跨角色庫存，以及專業技能升級路線輔助。
+A profession leveling and inventory management addon for **World of Warcraft: Forever (1.60.1)**.
 
-## v0.3.4 開發測試版
+Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-此版本已新增製造專業升級規劃的**第一階段實作**及採集專業文字指南。尚未經遊戲內實測，不保證資料庫 API 或畫面能在所有客戶端正常運作。完整規格見 [SPEC.md](SPEC.md)。
+> **Development build — v0.3.4.** The addon has not been comprehensively tested in-game. Recipe metadata, trainer locations, price estimates, and UI behavior may be incomplete or inaccurate. See [SPEC.md](SPEC.md) for the agreed feature requirements.
 
-## 安裝前必須準備的插件
+## Requirements
 
-| 插件 | 必要性 | 說明 |
+| Addon | Required? | Purpose |
 | --- | --- | --- |
-| [LibProfessionDB](https://www.curseforge.com/wow/addons/libprofessiondb) | **必要** | 必須安裝 Forever 1.60.1 專用版本（例如 v1.9.1）；提供尚未學習的配方與材料資料 |
-| [Ace3](https://www.curseforge.com/wow/addons/ace3) | **LibProfessionDB 相依套件** | 需確認能在 Forever 客戶端載入 |
-| [LibVersionCheck](https://www.curseforge.com/wow/addons/versioncheck) | **LibProfessionDB 相依套件** | 需選 Forever 版本；遊戲中會顯示 Lib: VersionCheck-1.0 |
-| [Auctionator](https://www.curseforge.com/wow/addons/auctionator) | **選用，成本推薦建議安裝** | 提供最後掃描的拍賣價格；必須有拍賣資料才能估算金幣 |
+| [LibProfessionDB](https://www.curseforge.com/wow/addons/libprofessiondb) | **Yes** | Forever-compatible recipes, including recipes not yet learned. Install the Forever 1.60.1 build (e.g. v1.9.1). |
+| [Ace3](https://www.curseforge.com/wow/addons/ace3) | LibProfessionDB dependency | Must load successfully in the Forever client. |
+| [LibVersionCheck](https://www.curseforge.com/wow/addons/versioncheck) | LibProfessionDB dependency | Use the Forever-compatible build (shown in-game as `Lib: VersionCheck-1.0`). |
+| [Auctionator](https://www.curseforge.com/wow/addons/auctionator) | Optional | Supplies previously scanned auction prices for leveling cost estimates. |
+| [OneForAll — Forever](https://github.com/smoergi/OneForAll_Forever) | Optional | Can collect the addon's minimap button into its button bar. |
 
-### 安裝與檢查
+## Installation
 
-1. 在 CurseForge 選擇 Forever 1.60.1，安裝 LibProfessionDB；依賴 Ace3、LibVersionCheck 需能正常載入。不要只看 CurseForge 的「已安裝」標籤。
-2. 將本儲存庫的 `*.lua` 與 `ForeverProfessionHelper.toc` 放進 `Interface/AddOns/ForeverProfessionHelper/`（切勿多包一層）。
-3. 在角色選擇畫面勾選 **Lib: ProfessionDB Forever** 與本插件；若顯示「關聯功能短少」，先檢查 Ace3 / LibVersionCheck。
-4. 載入遊戲輸入 `/fph db`，應顯示配方筆數與已覆蓋的專業 ID。資料庫正常註冊的驗證指令：
-   ```lua
-   /run print("Lib:", LibStub and LibStub("LibProfessionDB-1.0", true))
+1. Install the Forever-compatible LibProfessionDB build and ensure its dependencies are enabled. Do not assume the library loaded just because CurseForge says it is installed.
+2. Copy all `*.lua` files and `ForeverProfessionHelper.toc` into:
+   ```text
+   Interface/AddOns/ForeverProfessionHelper/
    ```
-   顯示 `table` 是成功取得函式庫；`nil` 則尚未成功註冊。
-5. 每個角色至少登入一次，並開啟銀行以更新銀行庫存。其他角色顯示最後快照。
+   Avoid an extra nested directory.
+3. At character selection, enable **Forever Profession Helper** and **Lib: ProfessionDB Forever**. If dependencies are reported missing, check Ace3 and LibVersionCheck.
+4. In-game, run `/reload` and `/fph db` to check the number of parsed recipes and covered profession IDs.
+5. Log into each character at least once, and open each character's bank to update its bank inventory snapshot.
 
-## OneForAll 小地圖按鈕整合
+To inspect library registration directly:
 
-v0.3.4 修正：在 .toc 註冊 MinimapButton.lua，修復 v0.3.3 按鈕完全未載入的問題。
+```lua
+/run print("Lib:", LibStub and LibStub("LibProfessionDB-1.0", true))
+```
 
-已加入 32×32 的小地圖啟動按鈕，無須修改 OneForAll 或額外登記。左鍵開啟總覽、右鍵開啟升級推薦。OneForAll 的「Quality of Life → Collect minimap buttons」開啟後，會掃描小地圖上的普通按鈕並收入收集列。這個整合依據 OneForAll 6.2.2 原始碼製作，尚待遊戲內實測。
+A table indicates that the library object is registered; `nil` indicates that it is unavailable under this name.
 
-## 使用指令
+## OneForAll minimap button integration
 
-- `/fph`：開啟角色和庫存概覽。
-- `/fph plan`：開啟升級推薦，預設第一個已記錄的專業。
-- `/fph plan 164`：指定專業 ID（例如 164 為鍛造）；視窗可按「切換專業」輪流查看已學的專業。
-- `/fph db`：顯示配方資料庫載入狀態、解析筆數與專業 ID。
-- `/fph scan`：重新掃描目前可讀的背包、銀行、專業。
-- `/fph help`：查看指令。
+**No registration, API key, or modification to OneForAll is required.**
 
-## 已實作的功能
+Forever Profession Helper includes its own 32 × 32 minimap button, designed to be picked up by the **OneForAll minimap button collector**.
 
-- 同伺服器所有已登入角色的專業與背包、銀行庫存快照。
-- 物品 Tooltip 顯示跨角色庫存與專業用途。
-- 配方資料庫的材料反向索引；資料不足時**不會標示「可賣」**。
-- 根據目前技能、訓練師來源、配方材料與庫存產生逐級**近似最低額外花費**的製造路線。
-- 使用 Auctionator 公開 API `Auctionator.API.v1.GetAuctionPriceByItemID` 取得已掃描單價。
-- 按專業獨立估算所缺材料與已知價格部分的額外成本。
-- 新增草藥學、採礦、剝皮的 1～300 文字採集指南（採集地圖與技能門檻為參考資料，Forever 實況待驗證）。
-- 升級推薦加入學習狀態（已學會／尚未學會／未確認）、學習所需專業技能、訓練師姓名與已收錄地點。對沒有明確對應 NPC 的製皮配方提供同陣營的一般專業訓練師參考，**不保證該 NPC 教授指定配方**。舊版 Classic 坐標及借用 Vanilla 的 Forever 來源會註明待驗證。
+- **Left-click:** Open the character and inventory overview.
+- **Right-click:** Open profession leveling recommendations.
+- **With OneForAll installed:** Open `/ofa` → **Quality of Life** → enable **Collect minimap buttons**. Expand OneForAll's collected-button bar to find the Forever Profession Helper button.
+- **Without OneForAll:** The button remains available on the minimap.
 
-## 已知限制（請先閱讀）
+**v0.3.4 fix:** `MinimapButton.lua` is now listed in `ForeverProfessionHelper.toc`. In v0.3.3, that omission prevented WoW from loading the button entirely.
 
-- **這是逐級貪婪近似規劃，不是全域最低成本最佳化器**；每級用預期成功率估算次數，不應當作精確購買數量。
-- 已可輪流切換已學專業，但仍未提供正式的多分頁 UI；採集指南使用靜態區間、未動態讀取採集點。
-- 部分配方的訓練師及技能條件借用 Vanilla 資料，尚未在 Forever 客戶端確認。來源不明時不列入成本推薦。
-- Auctionator 無價格時不會把物品的**商人賣價**誤當作購買成本；這些材料會顯示價格未知。若全都缺乏價格會嘗試使用可用訓練師配方，但無法保證是最低成本。
-- 已加入配方學習狀態的保守檢查，但未開啟相關專業視窗時可能回報未確認；專精限制仍不能保證完整判斷。
-- 目前未自動把熔煉等中間製成品展開計算，也不會模擬拍賣稅與拍賣場供給數量。
-- 沒有遊戲實測；錯誤回報請提供 Lua 錯誤及 `/fph db` 的資料。
+Integration is based on the [OneForAll Forever 6.2.2 minimap collector](https://github.com/smoergi/OneForAll_Forever/blob/main/OneForAll/MinimapCollector.lua) and is **not yet verified in-game**. If the button is absent, first confirm that `MinimapButton.lua` exists in the installed addon directory and is listed in the `.toc` file.
 
-## 資料安全
+## Commands
 
-所有物品整理、存銀行、郵寄與出售均由玩家手動進行。插件不會自動購物、賣出或寄送。
+| Command | Action |
+| --- | --- |
+| `/fph` | Open character and inventory overview. |
+| `/fph plan` | Open the leveling planner for the default recorded profession. |
+| `/fph plan 164` | Open the planner for a specific profession ID (164 = Blacksmithing). The UI also provides a profession-switch button. |
+| `/fph db` | Show library status, parsed recipe count, reagent links, and profession coverage. |
+| `/fph scan` | Rescan currently accessible bags, bank, and professions. |
+| `/fph help` | Show available commands. |
+
+## Features in the current development build
+
+- **Same-realm character tracking:** Save observed professions, bag inventory, and bank inventory snapshots. Offline inventory is not live.
+- **Item tooltips:** Display recorded quantities by character and detected profession uses.
+- **Conservative material classification:** Build a reverse reagent index from LibProfessionDB. Uncertain items are **not** labeled safe to sell.
+- **Crafting route estimates:** Suggest trainer-sourced recipes based on current skill, known materials, and estimated additional spend using an approximate greedy algorithm.
+- **Auctionator price lookup:** Use `Auctionator.API.v1.GetAuctionPriceByItemID` when prices are available.
+- **Shopping estimates:** Show missing material quantities after subtracting recorded same-realm stock and subtotal the materials with known prices.
+- **Gathering guides:** Text-only 1–300 guidance for Herbalism, Mining, and Skinning. Zones and skill thresholds are reference data and still need Forever-specific verification.
+- **Trainer hints:** Show recipe learning status when detectable, required skill, trainer names when present in the data, and known location hints. Some locations are from Classic/Vanilla and may not be accurate for Forever. A fallback profession trainer is **not a guarantee** that the NPC teaches a particular recipe.
+
+## Known limitations
+
+- The leveling algorithm is a **greedy estimate, not a globally optimized cheapest path**. Craft counts depend on estimated skill-up chances; shopping quantities are not exact.
+- The UI can cycle between professions but does not yet provide a full multi-tab interface. Gathering guidance is static and does not display map routes or live gathering nodes.
+- Some trainer sources and skill requirements are borrowed from Vanilla and have not been verified against Forever. Recipes with unverified sources may be excluded.
+- A vendor item's **sell price is not its purchase price**. If Auctionator has no usable price, the material is marked as unknown-cost; trainer recipes can still be suggested, but a minimum-cost claim cannot be guaranteed.
+- Learned-recipe detection can be inconclusive when the profession window is closed. Specialization restrictions may be incomplete.
+- Intermediate crafted reagents (such as smelted bars) are not automatically expanded into their inputs. Auction taxes and available auction quantities are not modeled.
+- No full in-game compatibility test has been performed. Include Lua errors and the output of `/fph db` when reporting a problem.
+
+## Safety and item handling
+
+The addon **does not** automatically buy, sell, mail, or move items. All inventory actions remain manual. A material not needed by the currently recorded professions may still have quest, trading, or other uses.
