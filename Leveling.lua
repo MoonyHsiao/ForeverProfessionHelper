@@ -59,8 +59,7 @@ local function Score(recipe, stock, level)
       else total = total + price * deficit end
     end
   end
-  if unknown > 0 then return { unknown = unknown, chance = chance, missing = missing } end
-  return { cost = total / chance, chance = chance, missing = missing }
+  return { cost = total / chance, unknown = unknown, chance = chance, missing = missing }
 end
 function A:PlanProfession(skillID, target)
   if not self.recipeDatabaseReady then return nil, "配方資料庫未就緒" end
@@ -72,21 +71,31 @@ function A:PlanProfession(skillID, target)
   if #recipes == 0 then return nil, "沒有可用的製造配方；採集專業請參考文字指南" end
   local stock = Holdings(self)
   local lines, shopping, steps, unresolved = {}, {}, 0, false
+  local diagnostic = { available = #recipes, trainer = 0, learnable = 0, difficultyUnknown = 0 }
   local maxSteps = 300
   while current < target and steps < maxSteps do
-    local best, bestScore, unknownCount
+    local best, bestScore
     for _, recipe in ipairs(recipes) do
+      if steps == 0 and recipe.trainer and not recipe.hidden and not recipe.requiredSpec then
+        diagnostic.trainer = diagnostic.trainer + 1
+        if (recipe.requiredSkill or 9999) <= current then
+          diagnostic.learnable = diagnostic.learnable + 1
+          if not recipe.difficulty or #recipe.difficulty < 4 then
+            diagnostic.difficultyUnknown = diagnostic.difficultyUnknown + 1
+          end
+        end
+      end
       local score = Score(recipe, stock, current)
-      if score and score.cost and (not bestScore or score.cost < bestScore.cost) then
-        best, bestScore = recipe, score
-      elseif score and score.unknown then
-        unknownCount = (unknownCount or 0) + 1
+      if score then
+        -- Unknown prices are a fallback, not a reason to hide every recipe.
+        if not bestScore or score.unknown < bestScore.unknown
+          or (score.unknown == bestScore.unknown and score.cost < bestScore.cost) then
+          best, bestScore = recipe, score
+        end
       end
     end
-    if not best then
-      unresolved = (unknownCount or 0) > 0
-      break
-    end
+    if not best then break end
+    if bestScore.unknown > 0 then unresolved = true end
     local times = math.max(1, math.ceil(1 / bestScore.chance))
     local start = current
     for _ = 1, times do
@@ -122,6 +131,7 @@ function A:PlanProfession(skillID, target)
     lines = lines, shopping = shopping, estimatedExtraCopper = totalCost,
     unknownPrices = unknownPrices,
     approximate = true, incomplete = current < target, missingPrices = unresolved,
+    diagnostics = diagnostic,
   }
 end
 function A:PlanSummary(skillID, target)
@@ -143,7 +153,9 @@ function A:PlanSummary(skillID, target)
     end
   end
   if result.incomplete then
-    textLines[#textLines + 1] = "路線未完成：缺可學訓練師配方、價格未知或技能區間無法覆蓋。"
+    textLines[#textLines + 1] = "路線未完成：無符合條件且具備技能機率的訓練師配方。"
+    local d = result.diagnostics or {}
+    textLines[#textLines + 1] = string.format("診斷：配方 %d、訓練師來源 %d、目前可學 %d、技能區間缺漏 %d", d.available or 0, d.trainer or 0, d.learnable or 0, d.difficultyUnknown or 0)
   end
   textLines[#textLines + 1] = "缺少材料（跨角色庫存已扣除）："
   local ids = {}
@@ -153,10 +165,11 @@ function A:PlanSummary(skillID, target)
     textLines[#textLines + 1] = string.format("  %s ×%d", (GetItemInfo and GetItemInfo(id)) or ("物品 " .. id), result.shopping[id])
     if i >= 35 then textLines[#textLines + 1] = "購物清單較長，僅顯示前 35 項"; break end
   end
-  textLines[#textLines + 1] = string.format("已知 Auctionator 額外成本：%dg %ds %dc",
+  textLines[#textLines + 1] = string.format("已知 Auctionator 額外成本（不含未知價格）：%dg %ds %dc",
     math.floor(result.estimatedExtraCopper / 10000),
     math.floor(result.estimatedExtraCopper % 10000 / 100),
     math.floor(result.estimatedExtraCopper % 100))
+  if result.missingPrices then textLines[#textLines + 1] = "部分材料價格未知，推薦結果不保證最低成本。" end
   if #result.unknownPrices > 0 then
     textLines[#textLines + 1] = "注意：" .. #result.unknownPrices .. " 種材料價格未知，以上不是總成本。"
   end
