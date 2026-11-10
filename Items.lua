@@ -22,23 +22,23 @@ local function addTooltip(tooltip)
   local status, users = A:Classify(id)
   local rows, total = A:ItemHoldings(id)
   tooltip:AddLine(" ")
-  tooltip:AddLine("永恆專業助手", 0.35, 0.8, 0.65)
+  tooltip:AddLine(A:T("TITLE"), 0.35, 0.8, 0.65)
   if status == "needed" then
-    tooltip:AddLine("需要（專業配方材料）", 0.3, 1, 0.3)
+    tooltip:AddLine(A:T("NEEDED"), 0.3, 1, 0.3)
     for i = 1, math.min(4, #users) do tooltip:AddLine("  " .. users[i], 0.8, 0.9, 0.8) end
   elseif status == "notneeded" then
-    tooltip:AddLine("不需要（同服目前專業配方未用到）", 1, 0.35, 0.35)
-    tooltip:AddLine("不代表沒有任務／交易等其他用途", 1, 0.7, 0.25)
+    tooltip:AddLine(A:T("NOT_NEEDED"), 1, 0.35, 0.35)
+    tooltip:AddLine(A:T("OTHER_USES"), 1, 0.7, 0.25)
   else
-    tooltip:AddLine("用途未確認（配方資料不足或非一般材料）", 1, 0.75, 0.25)
+    tooltip:AddLine(A:T("UNKNOWN_ITEM"), 1, 0.75, 0.25)
   end
-  tooltip:AddLine("同伺服器已記錄庫存：" .. total, 0.8, 0.8, 1)
+  tooltip:AddLine(A:T("INVENTORY_TOTAL", total), 0.8, 0.8, 1)
   for i = 1, math.min(10, #rows) do
     local row = rows[i]
-    tooltip:AddDoubleLine("  " .. row.name, "背包 " .. row.bags .. " / 銀行 " .. row.bank)
+    tooltip:AddDoubleLine("  " .. row.name, A:T("INVENTORY_LINE", row.bags, row.bank))
   end
   if not A:InventoryComplete() then
-    tooltip:AddLine("部分角色銀行尚未掃描，總數可能偏低", 1, 0.65, 0.2)
+    tooltip:AddLine(A:T("INCOMPLETE_BANKS"), 1, 0.65, 0.2)
   end
   tooltip:Show()
 end
