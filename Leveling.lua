@@ -122,6 +122,16 @@ function A:PlanProfession(skillID, target)
         local need = qty - onHand
         if need > 0 then shopping[id] = (shopping[id] or 0) + need end
       end
+      -- Crafted items must return to the simulated stock before the next
+      -- recommendation. Example: Fine Leather Belt -> Dark Leather Belt.
+      -- Only credit a confirmed item ID; assume one output unless the
+      -- recipe database supplies a reliable explicit yield.
+      local productID = tonumber(best.craftedItemId)
+      if productID and productID > 0 then
+        local yield = tonumber(best.craftedQuantity) or 1
+        yield = math.max(1, math.floor(yield))
+        stock[productID] = (stock[productID] or 0) + yield
+      end
     end
     current = current + 1 -- expected skill gain; recipe counts are estimates
     steps = steps + 1
