@@ -1,6 +1,6 @@
 local _, ns = ...
 local A = ns.A
-local frame, body, activeMode, title, scanButton, planButton, cycleButton, languageButton, languageMenu, professionMenu = nil, nil, "overview"
+local frame, body, activeMode, title, scanButton, cycleButton, languageButton, languageMenu, professionMenu = nil, nil, "overview"
 -- The planner is prepared after login by PlanCache.lua. The buttons
 -- only read cached results; they never run the recipe solver.
 local function CancelPlan() end
@@ -81,16 +81,9 @@ function A:ShowWindow(showPlan)
       activeMode = "overview"
       body:SetText(A:BuildOverview())
     end)
-    planButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    planButton:SetSize(115, 23)
-    planButton:SetPoint("RIGHT", scanButton, "LEFT", -6, 0)
-    planButton:SetText(A:T("PLAN"))
-    planButton:SetScript("OnClick", function()
-      StartPlan()
-    end)
     cycleButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     cycleButton:SetSize(115, 23)
-    cycleButton:SetPoint("RIGHT", planButton, "LEFT", -6, 0)
+    cycleButton:SetPoint("RIGHT", scanButton, "LEFT", -6, 0)
     cycleButton:SetText(A:T("SWITCH"))
     -- Rebuild options on open: learned professions and locale can change.
     -- Keep buttons around instead of allocating new frames each click.
@@ -191,7 +184,6 @@ function A:ShowWindow(showPlan)
     self:RegisterView("overview", function(reason)
       title:SetText(A:T("TITLE") .. " " .. A.version)
       scanButton:SetText(A:T("SCAN"))
-      planButton:SetText(A:T("PLAN"))
       cycleButton:SetText(A:T("SWITCH"))
       languageButton:SetText(A:T("LANGUAGE") .. ": " .. (A.languageNames[A.db.language or "auto"] or "Auto"))
       if frame:IsShown() then
@@ -208,7 +200,6 @@ function A:ShowWindow(showPlan)
   if title then
     title:SetText(self:T("TITLE") .. " " .. self.version)
     scanButton:SetText(self:T("SCAN"))
-    planButton:SetText(self:T("PLAN"))
     cycleButton:SetText(self:T("SWITCH"))
     languageButton:SetText(self:T("LANGUAGE") .. ": " .. (self.languageNames[self.db.language or "auto"] or "Auto"))
   end
