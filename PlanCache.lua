@@ -1,32 +1,19 @@
 local _, ns = ...
 local A = ns.A
 
--- Planning is prepared after login, not by the Leveling Guide button.
--- Cache keys are the current profession skill and a data revision; language
--- only changes formatting and does not invalidate the calculated route.
-local worker = CreateFrame("Frame")
-local cache, revision, active, debounceToken = {}, 0, nil, 0
-A.planCache = cache
+-- No background planner, coroutine, OnUpdate handler or runtime route solver.
+-- Recommendations come from StaticRoutes.lua (generated outside WoW).
+-- The current skill is the only character-specific input.
+local recipeIndexes = {}
 
-local function StopWorker()
-  active = nil
-  worker:SetScript("OnUpdate", nil)
-end
-
-local function Status(skillID)
-  local skill = A:Character().professions[tonumber(skillID)]
-  local current = skill and tonumber(skill.rank) or 0
-  local result = cache[tonumber(skillID)]
-  return result, current
-end
-
-function A:GetCachedPlan(skillID)
-  if not self.initialized then return nil end
-  local entry, skillLevel = Status(skillID)
-  if entry and entry.revision == revision and entry.level == skillLevel then
-    return entry.result, entry.error
-  end
-  return nil
+local function RecipeIndex(skillID)
+  local recipes = A:GetRecipesForSkill(skillID)
+  local cached = recipeIndexes[skillID]
+  if cached and cached.source == recipes then return cached.bySpell end
+  local bySpell = {}
+  for _, recipe in ipairs(recipes) do bySpell[tonumber(recipe.id)] = recipe end
+  recipeIndexes[skillID] = {source = recipes, bySpell = bySpell}
+  return bySpell
 end
 
 function A:GetCachedPrimaryPlanText(skillID)
@@ -34,92 +21,95 @@ function A:GetCachedPrimaryPlanText(skillID)
   local valid = self:GetEligibleProfessions()
   if #valid == 0 then return self:T("NO_ELIGIBLE") end
   local selected = valid[1]
-  for _, profession in ipairs(valid) do
-    if tonumber(skillID) == profession.id then selected = profession; break end
+  for _, prof in ipairs(valid) do
+    if tonumber(skillID) == prof.id then selected = prof; break end
   end
   self.selectedProfessionID = selected.id
   local guide = self.GetGatheringGuide and self:GetGatheringGuide(selected.id, selected.rank)
   if selected.id == 182 or selected.id == 393 then
     return guide or self:T("GUIDE_UNAVAILABLE")
   end
-  local result, err = self:GetCachedPlan(selected.id)
-  if not result then
-    if err then return err end
-    return self:T("PLAN_CALCULATING", selected.rank, 300)
-  end
-  local text = selected.name .. " " .. selected.rank .. "/300\n\n"
-    .. self:RenderPlanSummary(selected.id, result)
-  if guide then text = text .. "\n\n" .. guide end
-  return text
-end
+  if not self.recipeDatabaseReady then return self:T("PLAN_DB") end
 
-local function StartNext()
-  if active or not A.initialized then return end
-  if not A.recipeDatabaseReady then return end
-  local valid = A:GetEligibleProfessions()
-  for _, prof in ipairs(valid) do
-    if prof.id ~= 182 and prof.id ~= 393 then
-      local cached = cache[prof.id]
-      if not cached or cached.level ~= prof.rank or cached.revision ~= revision then
-        local stamp, level, skillID = revision, prof.rank, prof.id
-        local job = { id = skillID, level = level, revision = stamp, evaluations = 0 }
-        job.thread = coroutine.create(function()
-          return A:PlanProfession(skillID, 300, function()
-            job.evaluations = job.evaluations + 1
-            if job.evaluations % 8 == 0 then coroutine.yield() end
-          end)
-        end)
-        active = job
-        worker:SetScript("OnUpdate", function(self)
-          if active ~= job or job.revision ~= revision then
-            StopWorker()
-            StartNext()
-            return
-          end
-          local ok, result, err = coroutine.resume(job.thread)
-          if not ok then
-            cache[skillID] = {revision = stamp, level = level, error = tostring(result)}
-            StopWorker()
-            A:Notify("planReady")
-            StartNext()
-          elseif coroutine.status(job.thread) == "dead" then
-            cache[skillID] = {revision = stamp, level = level, result = result, error = err}
-            StopWorker()
-            A:Notify("planReady")
-            StartNext()
-          end
-        end)
-        return
-      end
+  local index = RecipeIndex(selected.id)
+  local current = tonumber(selected.rank) or 1
+  local projected = current
+  local rows, materials = {}, {}
+  local hasGreen, prepGain = false, 0
+  local operations = 0
+  while projected < 300 and operations < 350 do
+    local step = self:GetStaticLevelingStep(selected.id, projected)
+    if not step then break end
+    local spell, crafts, gain, color = step[1], step[2], step[3], step[4]
+    if not gain or gain <= 0 then break end
+    -- The fixed guide deliberately never re-ranks choices based on bags,
+    -- banks, prices, or user interactions.
+    local recipe = index[spell]
+    local name = (recipe and recipe.name) or
+      (GetSpellInfo and GetSpellInfo(spell)) or tostring(spell)
+    local colorName = ({"ORANGE", "YELLOW", "GREEN"})[color] or "UNKNOWN"
+    if color == 3 then hasGreen = true end
+    local prepLines = {}
+    for _, entry in ipairs(step[5] or {}) do
+      local prepID, count, expected = entry[1], entry[2], entry[3]
+      local prep = index[prepID]
+      local prepName = (prep and prep.name) or
+        (GetSpellInfo and GetSpellInfo(prepID)) or tostring(prepID)
+      prepLines[#prepLines + 1] = self:T("CRAFT_PREREQUISITE_GAIN",
+        prepName, count, expected)
+      prepGain = prepGain + expected
+    end
+    for _, material in ipairs(step[6] or {}) do
+      local id, qty = material[1], material[2]
+      materials[id] = (materials[id] or 0) + qty
+    end
+    local finish = math.min(300, projected + gain)
+    rows[#rows + 1] = {from = projected, to = finish, name = name,
+      crafts = crafts, color = colorName, preparations = prepLines,
+      recipe = recipe, spell = spell}
+    projected = finish
+    operations = operations + 1
+  end
+
+  local lines = {
+    selected.name .. " " .. current .. "/300",
+    "",
+    self:T("PLAN_HEADER", tostring(selected.id), current, math.floor(projected), 300),
+    self:T("PLAN_DISCLAIMER"),
+  }
+  for i, stage in ipairs(rows) do
+    for _, prepLine in ipairs(stage.preparations) do
+      lines[#lines + 1] = prepLine
+    end
+    lines[#lines + 1] = string.format("%d-%d: %s x%d [%s]",
+      math.floor(stage.from), math.floor(stage.to), stage.name,
+      stage.crafts, self:T("COLOR_" .. stage.color))
+    if i >= 35 then
+      lines[#lines + 1] = self:T("MORE_STAGES")
+      break
     end
   end
-end
+  if prepGain > 0 then lines[#lines + 1] = self:T("TOTAL_PREP_GAIN", prepGain) end
+  if hasGreen then lines[#lines + 1] = self:T("GREEN_FALLBACK") end
+  if projected < 300 then lines[#lines + 1] = self:T("PLAN_INCOMPLETE") end
 
-function A:InvalidatePlanCache(reason)
-  revision = revision + 1
-  -- Only the current session's cache is retained. Current prices are sampled
-  -- when the next plan is built; an explicit /fph scan forces a refresh.
-  for id in pairs(cache) do cache[id] = nil end
-  StopWorker()
-  debounceToken = debounceToken + 1
-  local token = debounceToken
-  if C_Timer and C_Timer.After then
-    C_Timer.After(1.0, function()
-      if token == debounceToken then StartNext() end
-    end)
-  else
-    StartNext()
+  lines[#lines + 1] = self:T("SHOPPING")
+  local ids = {}
+  for id in pairs(materials) do ids[#ids + 1] = id end
+  table.sort(ids)
+  for i, id in ipairs(ids) do
+    local itemName = (GetItemInfo and GetItemInfo(id)) or self:T("ITEM_FALLBACK", id)
+    lines[#lines + 1] = string.format("  %s x%d", itemName, materials[id])
+    if i >= 35 then
+      lines[#lines + 1] = self:T("SHOPPING_MORE")
+      break
+    end
   end
+  if guide then lines[#lines + 1] = ""; lines[#lines + 1] = guide end
+  return table.concat(lines, "\n")
 end
 
-function A:PreparePlanCache()
-  if not self.initialized then return end
-  self:InvalidatePlanCache("initialize")
-end
-
-A:RegisterView("planCache", function(reason)
-  if reason == "professions" or reason == "recipeDB" then
-    A:InvalidatePlanCache(reason)
-  end
-  -- planReady and language are presentation updates only.
-end)
+-- Retain no-op compatibility with older Core.lua callers. Neither function
+-- starts calculations, registers workers, or invalidates any generated routes.
+function A:InvalidatePlanCache() end
+function A:PreparePlanCache() end
