@@ -71,14 +71,12 @@ function A:GetStaticPlanSections(skillID)
       (GetSpellInfo and GetSpellInfo(spell)) or tostring(spell)
     local colorName = ({"ORANGE", "YELLOW", "GREEN"})[color] or "UNKNOWN"
     if color == 3 then hasGreen = true end
-    local prepLines = {}
+    local prepEntries = {}
     for _, entry in ipairs(step[5] or {}) do
       local prepID, count, expected = entry[1], entry[2], entry[3]
-      local prep = index[prepID]
-      local prepName = (prep and prep.name) or
-        (GetSpellInfo and GetSpellInfo(prepID)) or tostring(prepID)
-      prepLines[#prepLines + 1] = self:T("CRAFT_PREREQUISITE_GAIN",
-        prepName, count, expected)
+      prepEntries[#prepEntries + 1] = {
+        id = prepID, count = count, expected = expected,
+      }
       prepGain = prepGain + expected
     end
     for _, material in ipairs(step[6] or {}) do
@@ -86,9 +84,34 @@ function A:GetStaticPlanSections(skillID)
       materials[id] = (materials[id] or 0) + qty
     end
     local finish = math.min(300, projected + gain)
-    rows[#rows + 1] = {from = projected, to = finish, name = name,
-      crafts = crafts, color = colorName, preparations = prepLines,
-      recipe = recipe, spell = spell}
+    local previous = rows[#rows]
+    -- Aggregate adjacent levels using the same recipe and skill color.
+    -- Keep prerequisite order stable and sum their craft counts/skill gains.
+    if previous and previous.spell == spell and previous.color == colorName then
+      previous.to = finish
+      previous.crafts = previous.crafts + crafts
+      for _, prep in ipairs(prepEntries) do
+        local existing = previous.prepByID[prep.id]
+        if existing then
+          existing.count = existing.count + prep.count
+          existing.expected = existing.expected + prep.expected
+        else
+          local combined = {id = prep.id, count = prep.count, expected = prep.expected}
+          previous.preparations[#previous.preparations + 1] = combined
+          previous.prepByID[prep.id] = combined
+        end
+      end
+    else
+      local stage = {from = projected, to = finish, name = name,
+        crafts = crafts, color = colorName, preparations = {},
+        prepByID = {}, recipe = recipe, spell = spell}
+      for _, prep in ipairs(prepEntries) do
+        local combined = {id = prep.id, count = prep.count, expected = prep.expected}
+        stage.preparations[#stage.preparations + 1] = combined
+        stage.prepByID[prep.id] = combined
+      end
+      rows[#rows + 1] = stage
+    end
     projected = finish
     operations = operations + 1
   end
@@ -100,16 +123,20 @@ function A:GetStaticPlanSections(skillID)
     self:T("PLAN_DISCLAIMER"),
   }
   for i, stage in ipairs(rows) do
-    for _, prepLine in ipairs(stage.preparations) do
-      lines[#lines + 1] = prepLine
+    if i > 35 then
+      lines[#lines + 1] = self:T("MORE_STAGES")
+      break
+    end
+    for _, entry in ipairs(stage.preparations) do
+      local prep = index[entry.id]
+      local prepName = (prep and prep.name) or
+        (GetSpellInfo and GetSpellInfo(entry.id)) or tostring(entry.id)
+      lines[#lines + 1] = self:T("CRAFT_PREREQUISITE_GAIN",
+        prepName, entry.count, entry.expected)
     end
     lines[#lines + 1] = string.format("%d-%d: %s x%d [%s]",
       math.floor(stage.from), math.floor(stage.to), stage.name,
       stage.crafts, self:T("COLOR_" .. stage.color))
-    if i >= 35 then
-      lines[#lines + 1] = self:T("MORE_STAGES")
-      break
-    end
   end
   if prepGain > 0 then lines[#lines + 1] = self:T("TOTAL_PREP_GAIN", prepGain) end
   if hasGreen then lines[#lines + 1] = self:T("GREEN_FALLBACK") end
