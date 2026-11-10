@@ -88,6 +88,11 @@ SlashCmdList.FOREVERPROFESSIONHELPER = function(message)
   if message == "db" then
     local ready, status = A:LoadRecipeDatabase()
     A:Print("配方資料庫：" .. (ready and "已載入 " or "無法載入：") .. tostring(status))
+    A:Print("已解析配方 " .. tostring(A.recipeCount or 0) .. " 筆；材料關聯 " .. tostring(A.reagentCount or 0) .. " 筆")
+    local ids = {}
+    for id in pairs(A.recipeCoverage or {}) do ids[#ids + 1] = tostring(id) end
+    table.sort(ids)
+    A:Print("已覆蓋專業 ID：" .. (#ids > 0 and table.concat(ids, ", ") or "無"))
   elseif message == "scan" then
     A:ScanBags()
     if A.bankOpen then A:ScanBank() end
