@@ -43,49 +43,67 @@ function A:LoadRecipeDatabase()
   elseif not lib.GetRecipes or not lib.GetProfessions then
     status = "LibProfessionDB 缺少必要 API"
   else
-    local list = lib:GetProfessions()
-    if type(list) == "table" then
+    -- GetProfessions() may return an array, map, or keyed metadata.
+    -- Prefer the stable Classic skill-line ids, then supplement from the library.
+    local ids = {
+      [129]=true, [164]=true, [165]=true, [171]=true, [185]=true,
+      [186]=true, [197]=true, [202]=true, [333]=true, [356]=true,
+      [393]=true, [755]=true, [773]=true,
+    }
+    local okList, list = pcall(lib.GetProfessions, lib)
+    if okList and type(list) == "table" then
       for key, meta in pairs(list) do
-        local skillID = type(key) == "number" and key or nil
-        if type(meta) == "table" then
-          skillID = tonumber(meta.id or meta.skillLineID or meta.skillLineId or skillID)
-        elseif type(meta) == "number" then
-          skillID = meta
+        local candidate
+        if type(meta) == "number" then candidate = meta
+        elseif type(meta) == "table" then
+          candidate = tonumber(meta.id or meta.skillLineID or meta.skillLineId or meta.professionID)
         end
-        if skillID then
-          local ok, recipes = pcall(lib.GetRecipes, lib, skillID)
-          if ok and type(recipes) == "table" then
-            local count, before = 0, ingredients
-            for spellID, entry in pairs(recipes) do
-              local recipe = entry
-              if type(entry) == "number" and lib.GetRecipe then
-                local okRecipe, result = pcall(lib.GetRecipe, lib, skillID, entry)
-                if okRecipe then recipe = result end
-              end
-              if type(recipe) == "table" then
-                addReagents(skillID, recipe.name or tostring(spellID), recipe)
-                count = count + 1
-              end
-            end
-            if count > 0 and ingredients > before then
-              covered[skillID] = true
-              records = records + count
-            end
+        if candidate then ids[candidate] = true end
+        if type(key) == "number" and key > 100 then ids[key] = true end
+      end
+    end
+    for skillID in pairs(ids) do
+      local ok, recipes = pcall(lib.GetRecipes, lib, skillID)
+      if ok and type(recipes) == "table" then
+        local count, before = 0, ingredients
+        for spellID, entry in pairs(recipes) do
+          local actualSpellID = type(entry) == "number" and entry or tonumber(spellID)
+          local recipe = type(entry) == "table" and entry or nil
+          if not recipe and actualSpellID and lib.GetRecipe then
+            local okRecipe, result = pcall(lib.GetRecipe, lib, skillID, actualSpellID)
+            if okRecipe then recipe = result end
           end
+          if type(recipe) == "table" then
+            -- Some versions expose ingredients through GetReagents rather than inline.
+            if type(recipe.reagents) ~= "table" and actualSpellID and lib.GetReagents then
+              local okReagents, reagents = pcall(lib.GetReagents, lib, skillID, actualSpellID)
+              if okReagents then
+                recipe = { name = recipe.name, reagents = reagents }
+              end
+            end
+            addReagents(skillID, recipe.name or tostring(actualSpellID or spellID), recipe)
+            count = count + 1
+          end
+        end
+        if count > 0 and ingredients > before then
+          covered[skillID] = true
+          records = records + count
         end
       end
     end
-    if records == 0 then status = "配方索引為空；資料庫格式可能不相容" end
+    if records == 0 then status = "未解析到配方材料；請輸入 /fph db 查看診斷" end
   end
   -- A catalog that yields no usable ingredient ids is not safe for negative labels.
   self.recipeDatabaseReady = records > 0 and ingredients > 0
+  self.recipeCount, self.reagentCount = records, ingredients
+  self.recipeCoverage = covered
   self.recipeDatabaseStatus = self.recipeDatabaseReady and records or status
   self:Notify("recipeDB")
   return self.recipeDatabaseReady, self.recipeDatabaseStatus
 end
 
 function A:RecipeUsers(itemID)
-  local users, found, complete, hasProfession = {}, false, self.recipeDatabaseReady, false
+  local users, found, complete, hasProfession = {}, false, self.recipeDatabaseReady and records >= 2000, false
   if not self.initialized then return "unknown", users end
   local uses = index[itemID] or {}
   for _, ch in pairs(self:Store().characters) do
