@@ -74,7 +74,7 @@ function A:ShowWindow(showPlan)
     end)
     planButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     planButton:SetSize(115, 23)
-    planButton:SetPoint("RIGHT", button, "LEFT", -6, 0)
+    planButton:SetPoint("RIGHT", scanButton, "LEFT", -6, 0)
     planButton:SetText(A:T("PLAN"))
     planButton:SetScript("OnClick", function()
       activeMode = "plan"
