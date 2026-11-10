@@ -163,24 +163,37 @@ function A:PlanSummary(skillID, target)
   return table.concat(textLines, "\n")
 end
 
--- Default to the first learned crafting profession. Gathering professions currently
--- have no route data in this module and are reported separately.
-function A:GetPrimaryPlanText()
-  if not self.initialized then return "角色資料尚未就緒" end
-  local skills = self:Character().professions or {}
+-- Choose a profession by ID from /fph plan <skillID>, or cycle in UI.
+function A:GetEligibleProfessions()
   local valid = {}
-  for key, value in pairs(skills) do
-    local id = tonumber(key)
-    if id and #self:GetRecipesForSkill(id) > 0 then
-      valid[#valid + 1] = { id = id, rank = value.rank or 0, name = value.name or tostring(id) }
+  for id, skill in pairs(self:Character().professions or {}) do
+    local skillID = tonumber(id)
+    if skillID and (#self:GetRecipesForSkill(skillID) > 0 or
+      skillID == 182 or skillID == 186 or skillID == 393) then
+      valid[#valid + 1] = {
+        id = skillID, rank = skill.rank or 0, name = skill.name or tostring(skillID),
+      }
     end
   end
   table.sort(valid, function(a, b) return a.id < b.id end)
-  if #valid == 0 then
-    return "沒有可規劃的製造專業。採集專業文字指南仍待實作。"
+  return valid
+end
+function A:GetPrimaryPlanText(skillID)
+  if not self.initialized then return "角色資料尚未就緒" end
+  local valid = self:GetEligibleProfessions()
+  if #valid == 0 then return "沒有可規劃的專業，或配方資料庫尚未就緒。" end
+  local selection
+  for _, profession in ipairs(valid) do
+    if tonumber(skillID) == profession.id then selection = profession; break end
   end
-  local selection = valid[1]
-  return selection.name .. " " .. selection.rank .. "/300\n\n" ..
-    self:PlanSummary(selection.id, 300) ..
-    "\n\n目前先展示第一個製造專業；後續將加入專業切換。"
+  selection = selection or valid[1]
+  self.selectedProfessionID = selection.id
+  local guide = self.GetGatheringGuide and self:GetGatheringGuide(selection.id, selection.rank)
+  if selection.id == 182 or selection.id == 393 then
+    return guide or "採集指南尚未就緒"
+  end
+  local plan = selection.name .. " " .. selection.rank .. "/300\n\n" ..
+    self:PlanSummary(selection.id, 300)
+  if guide then plan = plan .. "\n\n" .. guide end
+  return plan
 end
