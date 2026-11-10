@@ -4,13 +4,13 @@ A profession leveling and inventory management addon for **World of Warcraft: Fo
 
 Track profession reagents and inventory across characters on the same realm, inspect item tooltips, and get estimated 1–300 profession leveling routes.
 
-> **Development branch — v1.1.3-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, cost estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
+> **Development branch — v1.1.4-dev** (based on the v1.0.0 baseline). The current feature baseline has been accepted for release. Profession recipes, trainer locations, cost estimates, and compatibility still depend on game/addon data and may be incomplete. See [SPEC.md](SPEC.md) for the requirements.
 
 ## Branches and versioning
 
 - **`main`**: the v1.0.0 baseline and future stable releases.
 - **`develop`**: ongoing feature development. Changes should be reviewed before merging into `main`.
-- Development builds increment **only the patch component**: `v1.1.3-dev` → `v1.1.3-dev` → `v1.1.4-dev`. Do not increase the minor version for ordinary `develop` commits.
+- Development builds increment **only the patch component**: `v1.1.4-dev` → `v1.1.5-dev` → `v1.1.6-dev`. Do not increase the minor version for ordinary `develop` commits.
 - When a set of changes is promoted to the stable `main` branch, bump the stable release to the next minor version (for example, `v1.2.0`) and drop the `-dev` suffix. This repository uses `main`, not `master`.
 - After that release, continue new development builds from the released series by increasing only the patch version (for example, `v1.2.1-dev`).
 - Keep version numbers synchronized in `ForeverProfessionHelper.toc` and `Core.lua`.
@@ -22,7 +22,6 @@ Track profession reagents and inventory across characters on the same realm, ins
 | [LibProfessionDB](https://www.curseforge.com/wow/addons/libprofessiondb) | **Yes** | Forever-compatible recipes, including recipes not yet learned. Install the Forever 1.60.1 build (e.g. v1.9.1). |
 | [Ace3](https://www.curseforge.com/wow/addons/ace3) | LibProfessionDB dependency | Must load successfully in the Forever client. |
 | [LibVersionCheck](https://www.curseforge.com/wow/addons/versioncheck) | LibProfessionDB dependency | Use the Forever-compatible build (shown in-game as `Lib: VersionCheck-1.0`). |
-| [Auctionator](https://www.curseforge.com/wow/addons/auctionator) | Optional | Supplies previously scanned auction prices for leveling cost estimates. |
 | [OneForAll — Forever](https://github.com/smoergi/OneForAll_Forever) | Optional | Can collect the addon's minimap button into its button bar. |
 
 ## Installation
@@ -84,14 +83,15 @@ Integration is based on the [OneForAll Forever 6.2.2 minimap collector](https://
 
 ## Features in the current development build
 
-- **Same-realm character tracking:** Save observed professions, bag inventory, and bank inventory snapshots. Offline inventory is not live.
-- **Item tooltips:** Display recorded quantities by character and detected profession uses.
-- **Conservative material classification:** Build a reverse reagent index from LibProfessionDB. Uncertain items are **not** labeled safe to sell.
-- **Crafting route estimates:** Prefer **orange and yellow** trainer recipes for reliable skill-ups, with green only as an explicitly labeled fallback. Color thresholds use numeric Forever skill data extracted from OneForAll (when available); cost estimates still use known inventory and Auctionator prices. Routes use a greedy heuristic, not a global optimum.
-- **Auctionator price lookup:** Use `Auctionator.API.v1.GetAuctionPriceByItemID` when prices are available.
-- **Shopping estimates:** Show missing material quantities after subtracting recorded same-realm stock and subtotal the materials with known prices.
-- **Gathering guides:** Text-only 1–300 guidance for Herbalism, Mining, and Skinning. Zones and skill thresholds are reference data and still need Forever-specific verification.
-- **Trainer hints:** Show recipe learning status when detectable, required skill, trainer names when present in the data, and known location hints. Some locations are from Classic/Vanilla and may not be accurate for Forever. A fallback profession trainer is **not a guarantee** that the NPC teaches a particular recipe.
+- **Same-realm inventory:** Track bags, bank and professions across recorded characters; offline stock is a snapshot.
+- **Material classification:** Identify materials used by learned professions and show relevant quantities in item tooltips.
+- **Leveling guide:** Prefer orange/yellow trainer recipes, with green only as fallback. Rank routes by approximate material units per expected skill-up, counting prerequisite skill gains.
+- **Intermediate recipes:** Reuse earlier crafted products and simulate up to three levels of same-profession prerequisites.
+- **Estimated materials:** Show gross raw-material requirements, **without deducting current inventory**.
+- **Gathering guides:** Text reference routes for Herbalism, Mining and Skinning.
+- **Trainer hints:** Show learned status when detectable, required skill and trainer/location references.
+
+**No Auctionator integration or cost optimization is used for the leveling planner.**
 
 ## Reuse of crafted intermediate items (develop)
 
@@ -99,34 +99,33 @@ The planner now simulates **crafted output items** as well as reagent consumptio
 
 Example: **Fine Leather Belt (item 4246) → Dark Leather Belt**. Belts crafted earlier in the selected route are counted as available materials for the later step. The recommendation output also lists how many intermediate items were reused.
 
-The planner now compares direct acquisition against recursively crafting intermediate reagents, using up to three dependency levels. Intermediate crafts are shown before the stage that consumes them. The recipe output mapping comes from OneForAll Forever for recipes whose LibProfessionDB crafted-item ID is absent. The planner still uses local greedy decisions; it is not yet a globally optimized route. It assumes one crafted item per operation unless recipe yield metadata is explicitly provided, and it only credits outputs with a valid crafted item ID.
+The planner recursively crafts available same-profession intermediate reagents, using up to three dependency levels. Intermediate crafts are shown before the stage that consumes them. The recipe output mapping comes from OneForAll Forever for recipes whose LibProfessionDB crafted-item ID is absent. The planner still uses local greedy decisions; it is not yet a globally optimized route. It assumes one crafted item per operation unless recipe yield metadata is explicitly provided, and it only credits outputs with a valid crafted item ID.
 
-Prerequisite crafts now contribute **estimated skill gains** before the parent recipe is simulated. The planner reevaluates later recipes using the updated projected skill, and lists expected skill gains next to prerequisite crafts. Yellow/green gains remain probability-based estimates, not guaranteed results. When prices are unknown, comparisons are provisional. The make-versus-buy heuristic compares material expense against estimated skill gains, but is not globally optimal. Cross-profession crafting is deliberately excluded: prerequisites must belong to the selected profession. An isolated Lua regression script is available at `tests/planner_prerequisites.lua` (not loaded by WoW). See [PLANNER_TEST_CASES.md](PLANNER_TEST_CASES.md) for the expected belt example. Changes in `develop` are not included in stable `main` until merged.
+Prerequisite crafts now contribute **estimated skill gains** before the parent recipe is simulated. The planner reevaluates later recipes using the updated projected skill, and lists expected skill gains next to prerequisite crafts. Yellow/green gains remain probability-based estimates, not guaranteed results. The route heuristic compares expected skill gains and raw material quantities, not market prices. Cross-profession crafting is deliberately excluded: prerequisites must belong to the selected profession. An isolated Lua regression script is available at `tests/planner_prerequisites.lua` (not loaded by WoW). See [PLANNER_TEST_CASES.md](PLANNER_TEST_CASES.md) for the expected belt example. Changes in `develop` are not included in stable `main` until merged.
 
-## Precomputed leveling plan cache (develop)
+## Prepared leveling routes (develop)
 
-The addon starts preparing profession plans **after login**, in a cooperative background worker. The **Leveling Guide button reads cached results**; it no longer starts the expensive 1–300 recipe optimization directly. If the worker is not finished, the UI shows a preparation message and updates when results arrive.
+After login, a background worker prepares a route for the current profession level using static recipe and skill-color data. Clicking **Leveling Guide** only displays the cached result.
 
-The recipe candidate sets are cached by profession and skill level. Inventory and profession scans only invalidate planned results if the scanned values actually change. A language change only rerenders the existing result. `/fph scan` forces a fresh plan (and samples currently available Auctionator prices); there is not yet a reliable automatic Auctionator-price-change event integration.
+Routes depend on profession skill, trainer-available recipes, skill-up probabilities and the benefits of making intermediate materials. They **do not depend on character inventory, auction prices, or vendor prices**. Only profession-level or recipe-data changes invalidate the prepared route. Inventory remains a separate feature.
 
-The full cost-aware plan depends on the current character's skill, known same-realm stock, and available Auctionator prices, so the final 1–300 path is not a single universal static list. Background precomputation keeps that work off the button click.
+The materials list estimates overall raw-material needs and deliberately does not subtract existing inventory.
 
 ## Recipe colors and OneForAll data
 
-Forever Profession Helper now includes `OneForAllSkillColors.lua`, a compact snapshot of 2,156 **numeric** recipe learning requirements and skill-color thresholds (yellow, green, gray), derived from [OneForAll Forever](https://github.com/smoergi/OneForAll_Forever/tree/main/OneForAll/Data/Professions). It does **not** require OneForAll to be installed and does not modify OneForAll. Recipe ingredients, trainer status and stock calculations still come from LibProfessionDB and this addon's own records.
+Forever Profession Helper now includes `OneForAllSkillColors.lua`, a compact snapshot of 2,156 **numeric** recipe learning requirements and skill-color thresholds (yellow, green, gray), derived from [OneForAll Forever](https://github.com/smoergi/OneForAll_Forever/tree/main/OneForAll/Data/Professions). It does **not** require OneForAll to be installed and does not modify OneForAll. Recipe ingredients and trainer status come from LibProfessionDB; inventory is tracked separately.
 
-The planner prefers orange/yellow recipes even if a green recipe looks cheaper. Green recipes only appear when no eligible orange/yellow trainer recipe with usable data is available at that skill level. Gray recipes are excluded. It displays the selected color and warns when green is used.
+The planner prefers orange/yellow recipes before green recipes. Green recipes only appear when no eligible orange/yellow trainer recipe with usable data is available at that skill level. Gray recipes are excluded. It displays the selected color and warns when green is used.
 
 The data may become outdated if OneForAll or WoW Forever changes its recipes. This is an extracted snapshot, **not a runtime connection** to OneForAll. See [DATA_SOURCES.md](DATA_SOURCES.md) for attribution and extraction notes.
 
 ## Known limitations
 
-- The leveling algorithm is a **greedy estimate, not a globally optimized cheapest path**. Craft counts depend on estimated skill-up chances; shopping quantities are not exact.
+- The leveling algorithm is a **greedy heuristic, not a globally optimal route**. Quantities and expected skill gains remain estimates.
 - The UI can cycle between professions but does not yet provide a full multi-tab interface. Gathering guidance is static and does not display map routes or live gathering nodes.
 - Some trainer sources and skill requirements are borrowed from Vanilla and have not been verified against Forever. Recipes with unverified sources may be excluded.
-- A vendor item's **sell price is not its purchase price**. If Auctionator has no usable price, the material is marked as unknown-cost; trainer recipes can still be suggested, but a minimum-cost claim cannot be guaranteed.
 - Learned-recipe detection can be inconclusive when the profession window is closed. Specialization restrictions may be incomplete.
-- Intermediate crafted reagents (such as smelted bars) are not automatically expanded into their inputs. Auction taxes and available auction quantities are not modeled.
+- Some intermediate materials may not be producible with available trainer recipes; cross-profession crafting is excluded.
 - No full in-game compatibility test has been performed. Include Lua errors and the output of `/fph db` when reporting a problem.
 
 ## Safety and item handling
