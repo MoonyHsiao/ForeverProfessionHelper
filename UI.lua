@@ -1,6 +1,6 @@
 local _, ns = ...
 local A = ns.A
-local frame, body
+local frame, body, activeMode = nil, nil, "overview"
 local function sortedKeys(map)
   local keys = {}
   for key in pairs(map or {}) do keys[#keys + 1] = key end
@@ -70,6 +70,7 @@ function A:ShowWindow(showPlan)
       if A.bankOpen then A:ScanBank() end
       A:ScanProfessions()
       A:ScanKnownRecipes()
+      activeMode = "overview"
       body:SetText(A:BuildOverview())
     end)
     local planButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
@@ -77,15 +78,20 @@ function A:ShowWindow(showPlan)
     planButton:SetPoint("RIGHT", button, "LEFT", -6, 0)
     planButton:SetText("升級推薦")
     planButton:SetScript("OnClick", function()
+      activeMode = "plan"
       body:SetText(A:GetPrimaryPlanText())
     end)
     self:RegisterView("overview", function()
-      if frame:IsShown() then body:SetText(A:BuildOverview()) end
+      if frame:IsShown() then
+        body:SetText(activeMode == "plan" and A:GetPrimaryPlanText() or A:BuildOverview())
+      end
     end)
   end
   if showPlan and self.GetPrimaryPlanText then
+    activeMode = "plan"
     body:SetText(self:GetPrimaryPlanText())
   else
+    activeMode = "overview"
     body:SetText(self:BuildOverview())
   end
   frame:Show()
